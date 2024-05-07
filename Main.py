@@ -80,10 +80,13 @@ class MyWindow(QMainWindow):
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableWidget.verticalHeader().setVisible(False)
 
+        for i in range(self.tableWidget.columnCount()):
+            self.tableWidget.horizontalHeader().setSectionResizeMode(i, QtWidgets.QHeaderView.Stretch)
+
         # Set up the table widget's properties
         self.tableWidget.setObjectName(u"tableWidget")
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, 801, 380))
-        self.tableWidget.horizontalHeader().setCascadingSectionResizes(True)
+        self.tableWidget.horizontalHeader().setCascadingSectionResizes(False)
         self.tableWidget.setColumnWidth(0, 100)
         for i in range(1, 4):
             self.tableWidget.setColumnWidth(i, 233)
@@ -196,7 +199,6 @@ class MyWindow(QMainWindow):
         reverse = False
         if parameter == "number":
             self.header_click_streak = 0
-            print(reverse)
             if self.last_clicked_header == "number":
                 self.last_clicked_header = ""
             else:
@@ -294,7 +296,7 @@ class SnifferWindow(MyWindow):
             packet = Packet(self.packet_count, packet)
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
-            
+
 
     def start_sniffing(self):
         if self.is_start_pressed == False:
@@ -348,7 +350,7 @@ class SnifferWindow(MyWindow):
         for packet in scapy_cap:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(packet.number, packet.protocol, packet.src, packet.dst)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
         self.recording_type = 'import'
 
@@ -364,7 +366,6 @@ class SnifferWindow(MyWindow):
     def show_sorted_packets(self):
         self.clear_table()
         for packet in self.packets:
-            print(packet.number)
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
 
 
