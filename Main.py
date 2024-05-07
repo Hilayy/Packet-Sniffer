@@ -173,7 +173,6 @@ class MyWindow(QMainWindow):
         filename = QFileDialog.getSaveFileName(self, 'Save Recording', os.path.join(desktop_path),
                                                "PCAP files (*.pcap)")
         self.save_file_name = filename[0]
-        print(self.save_file_name)
 
     def file_import_menu(self):
         file_filter = "PCAP files (*.pcap)"
@@ -298,8 +297,7 @@ class SnifferWindow(MyWindow):
             return
         if not self.is_recording_saved and self.packets != [] and self.recording_type == 'live':
             self.show_popup()
-            print(self.recording_type)
-            if self.start_recording_again == 0 or self.save_file_name != "":
+            if self.start_recording_again == 0 or self.save_file_name == "":
                 return
             if self.start_recording_again == 1:
                 self.save_recording_to_file()
