@@ -6,7 +6,7 @@ from PyQt5 import QtCore, QtGui
 from threading import Thread
 from scapy.all import *
 from scapy.layers.inet import *
-
+import time
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -196,27 +196,12 @@ class MyWindow(QMainWindow):
     def header_clicked(self, col_num):
         parameter_list = ["number", "protocol", "src", "dst"]
         parameter = parameter_list[col_num]
-        reverse = False
-        if parameter == "number":
-            self.header_click_streak = 0
-            if self.last_clicked_header == "number":
-                self.last_clicked_header = ""
-            else:
-                reverse = True
-                self.last_clicked_header = "number"
-
+        if self.parameters_list[0] == parameter:
+            self.parameters_list[1] = not self.parameters_list[1]
         else:
-            if self.last_clicked_header == parameter:
-                self.header_click_streak += 1
-                if self.header_click_streak == 3:
-                    self.header_click_streak = 0
-                    parameter = "number"
-                if self.header_click_streak == 2:
-                    reverse = True
-            else:
-                self.header_click_streak = 1
-                self.last_clicked_header = parameter
-        self.sort_by_parameter(parameter, reverse)
+            self.parameters_list[0] = parameter
+            self.parameters_list[1] = False
+        self.sort_by_parameter()
 
 
 
@@ -231,8 +216,6 @@ class PacketDetailsWindow(QtWidgets.QWidget):
         self.setWindowTitle(f'Packet {self.number}')
         self.setGeometry(400, 100, 500, 400)
         self.label = QtWidgets.QLabel(self.text, self)
-
-
 
 
 
@@ -274,8 +257,7 @@ class SnifferWindow(MyWindow):
         self.is_recording_saved = False
         self.stop_recording = False
         self.packet_count = 0
-        self.last_clicked_header = ""
-        self.header_click_streak = 0
+        self.parameters_list = ['a', False]
         self.is_original = True
 
     def send_stop_packet(self):
@@ -294,8 +276,10 @@ class SnifferWindow(MyWindow):
         if True:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+
+
 
 
     def start_sniffing(self):
@@ -354,19 +338,22 @@ class SnifferWindow(MyWindow):
             self.packets.append(packet)
         self.recording_type = 'import'
 
-    def sort_by_parameter(self, parameter, rev):
-        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, parameter), reverse=rev)
+    def sort_by_parameter(self):
+        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, self.parameters_list[0]), reverse=self.parameters_list[1])
         self.show_sorted_packets()
-        if parameter == "number" and rev is False:
-            self.is_original = True
-        else:
-            self.is_original = False
+        self.is_original = self.parameters_list[0] == "number" and self.parameters_list[1] is False
+
 
 
     def show_sorted_packets(self):
         self.clear_table()
         for packet in self.packets:
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+
+
+
+
+
 
 
 
