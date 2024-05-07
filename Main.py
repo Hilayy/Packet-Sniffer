@@ -151,6 +151,7 @@ class MyWindow(QMainWindow):
        msg.setStandardButtons(QMessageBox.Save|QMessageBox.Ignore|QMessageBox.Cancel)
        msg.setDefaultButton(QMessageBox.Save)
        msg.buttonClicked.connect(self.popup_button)
+       msg.rejected.connect(self.popup_rejected)
        x = msg.exec_()
 
     def popup_button(self, i):
@@ -162,6 +163,10 @@ class MyWindow(QMainWindow):
             self.start_recording_again = 2
         if i.text() == "Cancel":
             self.start_recording_again = 0
+
+    def popup_rejected(self):
+        self.start_recording_again = 0
+        
 
     def file_save_menu(self):
         desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
