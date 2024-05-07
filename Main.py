@@ -53,60 +53,75 @@ class MyWindow(QMainWindow):
         self.importButton.setFont(font)
         self.importButton.clicked.connect(self.import_recording)
 
-        # table
         self.tableWidget = QtWidgets.QTableWidget(self)
         self.tableWidget.setStyleSheet(
             "QTableWidget { background-color: #313242; border: 1px solid #313242; }"
             "QTableCornerButton::section { background-color: #5c5e82; }"
         )
-        self.tableWidget.setColumnCount(3)
+        self.tableWidget.setColumnCount(4)
         self.tableWidget.setRowCount(0)
 
-        column_names = ["Protocol", "Source", "Destination"]
+        column_names = ["#", "Protocol", "Source", "Destination"]
         self.tableWidget.setHorizontalHeaderLabels(column_names)
         row_names = ["1"]
         self.tableWidget.setVerticalHeaderLabels(row_names)
+
+        # Set font for header
         self.font = QtGui.QFont("Circular")
         self.font.setPointSize(14)
         self.tableWidget.horizontalHeader().setFont(self.font)
+
         header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
         self.tableWidget.horizontalHeader().setStyleSheet(header_stylesheet)
         self.tableWidget.verticalHeader().setStyleSheet(header_stylesheet)
+
         self.tableWidget.itemDoubleClicked.connect(self.open_packet_details)
         self.tableWidget.horizontalHeader().sectionClicked.connect(self.header_clicked)
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
+        self.tableWidget.verticalHeader().setVisible(False)
 
         # Set up the table widget's properties
         self.tableWidget.setObjectName(u"tableWidget")
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, 801, 380))
         self.tableWidget.horizontalHeader().setCascadingSectionResizes(True)
-        self.tableWidget.horizontalHeader().setDefaultSectionSize(267)
+        self.tableWidget.setColumnWidth(0, 100)
+        for i in range(1, 4):
+            self.tableWidget.setColumnWidth(i, 233)
 
-    def header_clicked(self, logicalIndex):
-        print(f'Header clicked: {logicalIndex}')
+        # Align column titles to the left
+        for i in range(len(column_names)):
+            item = QtWidgets.QTableWidgetItem(column_names[i])
+            item.setTextAlignment(QtCore.Qt.AlignLeft)
+            self.tableWidget.setHorizontalHeaderItem(i, item)
 
-    def add_to_table(self, protocol, src, dst):
+    def add_to_table(self, number, protocol, src, dst):
         row_number = self.tableWidget.rowCount()
         self.tableWidget.insertRow(row_number)
         self.tableWidget.setRowHeight(row_number, 50)
+
+        item_number = QtWidgets.QTableWidgetItem(number)
+        item_number.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
+        item_number.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)  # Make item read-only
+        item_number.setFont(self.font)
+        self.tableWidget.setItem(row_number, 0, item_number)
 
         item_protocol = QtWidgets.QTableWidgetItem(protocol)
         item_protocol.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
         item_protocol.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)  # Make item read-only
         item_protocol.setFont(self.font)
-        self.tableWidget.setItem(row_number, 0, item_protocol)
+        self.tableWidget.setItem(row_number, 1, item_protocol)
 
         item_src = QtWidgets.QTableWidgetItem(src)
         item_src.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
         item_src.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)  # Make item read-only
         item_src.setFont(self.font)
-        self.tableWidget.setItem(row_number, 1, item_src)
+        self.tableWidget.setItem(row_number, 2, item_src)
 
         item_dst = QtWidgets.QTableWidgetItem(dst)
         item_dst.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
         item_dst.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)  # Make item read-only
         item_dst.setFont(self.font)
-        self.tableWidget.setItem(row_number, 2, item_dst)
+        self.tableWidget.setItem(row_number, 3, item_dst)
         if (self.tableWidget.verticalScrollBar().maximum() - self.tableWidget.verticalScrollBar().value() <= 7):
             self.tableWidget.verticalScrollBar().setValue(self.tableWidget.verticalScrollBar().maximum())
 
@@ -117,7 +132,8 @@ class MyWindow(QMainWindow):
         self.adjust_table_size(width, height)
 
     def adjust_table_size(self, width, height):
-        self.tableWidget.horizontalHeader().setDefaultSectionSize(int(width / 3) - 3)
+        for i in range(1, 4):
+            self.tableWidget.setColumnWidth(i, int((width - 100) / 3))
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, width, height - 130))
 
     def change_record_buttons_color(self, is_pressed):
@@ -174,6 +190,33 @@ class MyWindow(QMainWindow):
         self.tableWidget.clearContents()
         self.tableWidget.setRowCount(0)
 
+    def header_clicked(self, col_num):
+        parameter_list = ["number", "protocol", "src", "dst"]
+        parameter = parameter_list[col_num]
+        reverse = False
+        if parameter == "number":
+            self.header_click_streak = 0
+            print(reverse)
+            if self.last_clicked_header == "number":
+                self.last_clicked_header = ""
+            else:
+                reverse = True
+                self.last_clicked_header = "number"
+
+        else:
+            if self.last_clicked_header == parameter:
+                self.header_click_streak += 1
+                if self.header_click_streak == 3:
+                    self.header_click_streak = 0
+                    parameter = "number"
+                if self.header_click_streak == 2:
+                    reverse = True
+            else:
+                self.header_click_streak = 1
+                self.last_clicked_header = parameter
+        self.sort_by_parameter(parameter, reverse)
+
+
 
 class PacketDetailsWindow(QtWidgets.QWidget):
     def __init__(self, text, number):
@@ -186,6 +229,9 @@ class PacketDetailsWindow(QtWidgets.QWidget):
         self.setWindowTitle(f'Packet {self.number}')
         self.setGeometry(400, 100, 500, 400)
         self.label = QtWidgets.QLabel(self.text, self)
+
+
+
 
 
 class Packet:
@@ -226,6 +272,9 @@ class SnifferWindow(MyWindow):
         self.is_recording_saved = False
         self.stop_recording = False
         self.packet_count = 0
+        self.last_clicked_header = ""
+        self.header_click_streak = 0
+        self.is_original = True
 
     def send_stop_packet(self):
         self.stop_recording = True
@@ -243,8 +292,9 @@ class SnifferWindow(MyWindow):
         if True:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(packet.protocol, packet.src, packet.dst)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
+            
 
     def start_sniffing(self):
         if self.is_start_pressed == False:
@@ -298,9 +348,31 @@ class SnifferWindow(MyWindow):
         for packet in scapy_cap:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(packet.protocol, packet.src, packet.dst)
+            self.add_to_table(packet.number, packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
         self.recording_type = 'import'
+
+    def sort_by_parameter(self, parameter, rev):
+        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, parameter), reverse=rev)
+        self.show_sorted_packets()
+        if parameter == "number" and rev is False:
+            self.is_original = True
+        else:
+            self.is_original = False
+
+
+    def show_sorted_packets(self):
+        self.clear_table()
+        for packet in self.packets:
+            print(packet.number)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+
+
+
+
+
+
+
 
 
 def window():
