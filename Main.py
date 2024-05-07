@@ -260,7 +260,7 @@ class SnifferWindow(MyWindow):
                     return
                 if self.start_recording_again == 1:
                     self.save_recording_to_file()
-
+            self.packet_count = 0
             self.stop_recording = False
             self.clear_packets()
             sniff_thread = Thread(target=self.sniffing)
@@ -305,11 +305,12 @@ class SnifferWindow(MyWindow):
         scapy_cap = rdpcap(file_name)
         self.packet_count = 0
         for packet in scapy_cap:
+            self.packet_count += 1
             packet = Packet(self.packet_count, packet)
             self.add_to_table(packet.protocol, packet.src, packet.dst)
             self.packets.append(packet)
-            self.packet_count += 1
         self.recording_type = 'import'
+
 
 def window():
     # set window and window properties
