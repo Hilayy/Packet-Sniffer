@@ -14,7 +14,7 @@ class MyWindow(QMainWindow):
         super(MyWindow, self).__init__()
         self.setGeometry(100, 100, 800, 500)
         self.setWindowTitle("Sniffer")
-        self.initUI(
+        self.initUI()
         self.pdws = []
 
     def initUI(self):
