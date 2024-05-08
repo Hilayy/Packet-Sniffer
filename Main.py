@@ -8,6 +8,7 @@ from scapy.all import *
 from scapy.layers.inet import *
 import time
 
+
 class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
@@ -201,8 +202,7 @@ class MyWindow(QMainWindow):
         else:
             self.parameters_list[0] = parameter
             self.parameters_list[1] = False
-        self.sort_by_parameter()
-
+        self.sort_and_show()
 
 
 class PacketDetailsWindow(QtWidgets.QWidget):
@@ -218,7 +218,6 @@ class PacketDetailsWindow(QtWidgets.QWidget):
         self.label = QtWidgets.QLabel(self.text, self)
 
 
-
 class Packet:
     def __init__(self, count, packet_body):
         self.number = count
@@ -227,17 +226,37 @@ class Packet:
         self.src, self.dst = self.__get_ends()
 
     def __get_protocol(self):
-        if "DNS" in str(self.info):
-            return "DNS"
+        if TCP in self.info and self.info.haslayer(Raw):
+            raw_data = self.info[Raw].load.decode('utf-8', 'ignore')
+            if "HTTP" in raw_data:
+                return "HTTP"
+        if UDP in self.info:
+            if self.info[UDP].dport == 1900 or self.info[UDP].sport == 1900:
+                return "SSDP"
         if ICMP in self.info:
             return "ICMP"
         if IPv6 in self.info:
             if self.info[IPv6].nh == 58:
-                return "ICMPV6"
+                return "ICMPv6"
+        if "DHCP" in str(self.info):
+            return "DHCP"
+        if IP in self.info:
+            proto_number = self.info[IP].proto
+            if proto_number == 2:
+                return "IGMPv2"
+            if proto_number == 58:
+                return "IGMPv3"
+        if UDP in self.info:
+            if self.info[UDP].dport == 5353:
+                return "MDNS"
+        if "DNS" in str(self.info):
+            return "DNS"
         if TCP in self.info:
             return "TCP"
         if UDP in self.info:
             return "UDP"
+        if IP in self.info or IPv6 in self.info:
+            return "UNKNOWN"
         return "ARP"
 
     def __get_ends(self):
@@ -263,36 +282,36 @@ class SnifferWindow(MyWindow):
     def send_stop_packet(self):
         self.stop_recording = True
         self.is_start_pressed = False
-        self.sort_by_parameter()
+        if not self.is_original:
+            self.sort_and_show()
         self.change_record_buttons_color(self.is_start_pressed)
-
-
-
-
 
     def stopfilter(self, x):
         return self.stop_recording
 
     def sniffing(self):
-        sniff(filter=" arp or tcp or udp or icmp or icmp6", prn=self.process_packet,
+        scapy.config.sniff_promisc = 0
+        sniff(filter="arp or tcp or udp or icmp or icmp6", prn=self.process_packet,
               stop_filter=self.stopfilter)
 
-    def process_packet(self, packet):
-        if True:
-            self.packet_count += 1
-            print(self.packet_count)
-            packet = Packet(self.packet_count, packet)
-            self.packets.append(packet)
-            if self.is_original:
-                self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
-            else:
-                self.live_sorted_packets()
+    def process_packet(self, new_packet):
+        new_packet = self.register_packet(new_packet)
+        self.add_packet_or_wait(new_packet)
 
+    def register_packet(self, new_packet):
+        self.packet_count += 1
+        new_packet = Packet(self.packet_count, new_packet)
+        self.packets.append(new_packet)
+        return new_packet
 
-
+    def add_packet_or_wait(self, new_packet):
+        if self.is_original:
+            self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst)
+        else:
+            self.live_sorted_packets()
 
     def start_sniffing(self):
-        if self.is_start_pressed == False:
+        if self.is_start_pressed is False:
             if self.packets != [] and self.is_recording_saved is False and self.recording_type == 'live':
                 self.show_popup()
                 if self.start_recording_again == 0 or self.save_file_name != "":
@@ -302,6 +321,8 @@ class SnifferWindow(MyWindow):
             self.packet_count = 0
             self.stop_recording = False
             self.clear_packets()
+            self.is_original = True  # reset sort parameters
+            self.parameters_list = ['a', False]  # reset sort parameters
             sniff_thread = Thread(target=self.sniffing)
             sniff_thread.start()
             self.is_start_pressed = True
@@ -322,15 +343,16 @@ class SnifferWindow(MyWindow):
             self.is_recording_saved = True
 
     def save_recording_to_file(self):
-        l = [x.info for x in self.packets]
-        wrpcap(self.save_file_name, l)
+        self.reset_packet_order()
+        save_list = [x.info for x in self.packets]
+        wrpcap(self.save_file_name, save_list)
 
     def import_recording(self):
         if self.is_start_pressed:
             return
         if not self.is_recording_saved and self.packets != [] and self.recording_type == 'live':
             self.show_popup()
-            if self.start_recording_again == 0 or self.save_file_name == "":
+            if (self.start_recording_again == 0 or self.save_file_name == "") and self.start_recording_again != 2:
                 return
             if self.start_recording_again == 1:
                 self.save_recording_to_file()
@@ -347,12 +369,14 @@ class SnifferWindow(MyWindow):
             self.packets.append(packet)
         self.recording_type = 'import'
 
-    def sort_by_parameter(self):
-        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, self.parameters_list[0]), reverse=self.parameters_list[1])
+    def sort_and_show(self):
+        self.sort_by_parameter()
         self.show_sorted_packets()
         self.is_original = self.parameters_list[0] == "number" and self.parameters_list[1] is False
 
-
+    def sort_by_parameter(self):
+        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, self.parameters_list[0]),
+                              reverse=self.parameters_list[1])
 
     def show_sorted_packets(self):
         self.clear_table()
@@ -361,13 +385,15 @@ class SnifferWindow(MyWindow):
 
     def live_sorted_packets(self):
         if self.packet_count % 5 == 0:
-            self.sort_by_parameter()
+            self.sort_and_show()
         time.sleep(0.5)
 
-
-
-
-
+    def reset_packet_order(self):
+        temp1 = self.parameters_list[0]
+        temp2 = self.parameters_list[1]
+        self.parameters_list = ["number", False]
+        self.sort_by_parameter()
+        self.parameters_list = [temp1, temp2]
 
 
 def window():
