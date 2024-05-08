@@ -263,7 +263,12 @@ class SnifferWindow(MyWindow):
     def send_stop_packet(self):
         self.stop_recording = True
         self.is_start_pressed = False
+        self.sort_by_parameter()
         self.change_record_buttons_color(self.is_start_pressed)
+
+
+
+
 
     def stopfilter(self, x):
         return self.stop_recording
@@ -275,9 +280,13 @@ class SnifferWindow(MyWindow):
     def process_packet(self, packet):
         if True:
             self.packet_count += 1
+            print(self.packet_count)
             packet = Packet(self.packet_count, packet)
             self.packets.append(packet)
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+            if self.is_original:
+                self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+            else:
+                self.live_sorted_packets()
 
 
 
@@ -350,12 +359,10 @@ class SnifferWindow(MyWindow):
         for packet in self.packets:
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
 
-
-
-
-
-
-
+    def live_sorted_packets(self):
+        if self.packet_count % 5 == 0:
+            self.sort_by_parameter()
+        time.sleep(0.5)
 
 
 
