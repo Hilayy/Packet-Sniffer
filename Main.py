@@ -3,7 +3,7 @@ import sys
 from PyQt5 import QtWidgets
 from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog
 from PyQt5 import QtCore, QtGui
-from threading import Thread
+from threading import Thread, Event, Lock
 from scapy.all import *
 from scapy.layers.inet import *
 import time
@@ -278,10 +278,14 @@ class SnifferWindow(MyWindow):
         self.packet_count = 0
         self.parameters_list = ['a', False]
         self.is_original = True
+        self.check = True
+
+
 
     def send_stop_packet(self):
         self.stop_recording = True
         self.is_start_pressed = False
+        self.check = False
         if not self.is_original:
             self.sort_and_show()
         self.change_record_buttons_color(self.is_start_pressed)
@@ -308,7 +312,7 @@ class SnifferWindow(MyWindow):
         if self.is_original:
             self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst)
         else:
-            self.live_sorted_packets()
+            pass
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
@@ -323,9 +327,11 @@ class SnifferWindow(MyWindow):
             self.clear_packets()
             self.is_original = True  # reset sort parameters
             self.parameters_list = ['a', False]  # reset sort parameters
+            self.is_start_pressed = True
             sniff_thread = Thread(target=self.sniffing)
             sniff_thread.start()
-            self.is_start_pressed = True
+            live_sort_thread = Thread(target=self.live_sorted_packets)
+            live_sort_thread.start()
             self.change_record_buttons_color(self.is_start_pressed)
             self.recording_type = 'live'
             self.is_recording_saved = False
@@ -370,6 +376,8 @@ class SnifferWindow(MyWindow):
         self.recording_type = 'import'
 
     def sort_and_show(self):
+        if self.parameters_list[0] == 'a':
+            return
         self.sort_by_parameter()
         self.show_sorted_packets()
         self.is_original = self.parameters_list[0] == "number" and self.parameters_list[1] is False
@@ -384,9 +392,18 @@ class SnifferWindow(MyWindow):
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
 
     def live_sorted_packets(self):
-        if self.packet_count % 5 == 0:
-            self.sort_and_show()
-        time.sleep(0.5)
+        while True:
+            if self.is_original is False and self.is_start_pressed:
+                self.sort_and_show()
+                time.sleep(2)
+                print(0)
+            else:
+                time.sleep(1)
+                print("recording not live")
+
+
+
+
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
@@ -407,3 +424,5 @@ def window():
 
 if __name__ == "__main__":
     window()
+
+
