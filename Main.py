@@ -6,8 +6,11 @@ from PyQt5 import QtCore, QtGui
 from threading import Thread, Event, Lock
 from scapy.all import *
 from scapy.layers.inet import *
+from scapy.layers.tls import *
 import time
 
+
+TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -16,6 +19,8 @@ class MyWindow(QMainWindow):
         self.setWindowTitle("Sniffer")
         self.initUI()
         self.pdws = []
+        self.setMinimumWidth(800)
+        self.setMinimumHeight(500)
 
     def initUI(self):
         # Start recording button
@@ -222,10 +227,20 @@ class Packet:
     def __init__(self, count, packet_body):
         self.number = count
         self.info = packet_body
+        self.length = self.__get_length()
         self.protocol = self.__get_protocol()
         self.src, self.dst = self.__get_ends()
+        self.__configure_get_summary()
+
+    def __get_length(self):
+        return len(self.info)
 
     def __get_protocol(self):
+        if self.info.haslayer(TCP):
+            if self.info.haslayer(Raw):  # Raw layer often encapsulates TLS
+                raw_data = self.info.getlayer(Raw).load
+                if raw_data.startswith(b'\x16\x03'):  # TLS starts with 0x16 0x03
+                    return "TLSvX"
         if TCP in self.info and self.info.haslayer(Raw):
             raw_data = self.info[Raw].load.decode('utf-8', 'ignore')
             if "HTTP" in raw_data:
@@ -266,6 +281,94 @@ class Packet:
             return self.info[IP].src, self.info[IP].dst
         return self.info.src, self.info.dst if self.info.dst != 'ff:ff:ff:ff:ff:ff' else 'Broadcast'
 
+    def __configure_get_summary(self):
+        if self.protocol == "ARP":
+            self.__get_summary_arp()
+        if self.protocol == "UDP":
+            self.__get_summary_udp()
+        if self.protocol == "TCP":
+            self.__get_summary_tcp()
+        if self.protocol == "DNS":
+            self.__get_summary_dns()
+        if self.protocol == "ICMP":
+            self.__get_summary_icmp()
+
+
+    def __get_summary_arp(self):
+        opcode = self.info.op
+        summary_string = ""
+        if opcode == 1:
+            requested_ip = self.info.pdst
+            tell_to_ip = self.info.psrc
+            summary_string = f"Who has {requested_ip}? Tell {tell_to_ip}"
+        if opcode == 2:
+            requested_ip_answer = self.info.psrc
+            mac_of_ip = self.info.hwsrc
+            summary_string = f"{requested_ip_answer} is at {mac_of_ip}"
+        print(summary_string)
+
+    def __get_summary_udp(self):
+        udp_segment = self.info[UDP]
+        payload_size = len(udp_segment)
+        source_port = udp_segment.sport
+        destination_port = udp_segment.dport
+        summary_string = f"{source_port} -> {destination_port}, Payload size: {payload_size}"
+        print(summary_string)
+
+    def __get_summary_tcp(self):
+        tcp_segment = self.info[TCP]
+        payload_size = len(tcp_segment)
+        source_port = tcp_segment.sport
+        destination_port = tcp_segment.dport
+        flags = tcp_segment.flags
+        flags_string_list = []
+        for flag in flags:
+            flags_string_list.append(TCP_FLAGS[flag])
+        flags_string = ", ".join(flags_string_list)
+        summary_string = f"{source_port} -> {destination_port}, [{flags_string}], Payload size: {payload_size} "
+        print(summary_string)
+
+    def __get_summary_dns(self):
+        dns_segment = self.info[DNS]
+        summary_string = ""
+        if dns_segment.opcode == 0:
+            if dns_segment.qr == 0:
+                summary_string = "Standard Query"
+            else:
+                summary_string = "Standard Query Response"
+        if dns_segment.opcode == 4:
+            summary_string = "Notify"
+        if dns_segment.opcode == 5:
+            summary_string = "Update"
+        is_error = dns_segment.rcode != 0
+        if is_error:
+            summary_string = "DNS Error"
+        print(summary_string)
+
+    def __get_summary_icmp(self):
+        icmp_segment = self.info[ICMP]
+        pattern = r'type {1,}=.{1,}'
+        icmp_type_text = re.findall(pattern, icmp_segment.show(dump=True))[0]
+        icmp_type_text = icmp_type_text[icmp_type_text.index('=') + 2:]
+        icmp_type_text = icmp_type_text.replace('-', ' ')
+        icmp_type_text = icmp_type_text.title()
+        ip_segment = self.info[IP]
+        ttl = ip_segment.ttl
+        summary_string = f"{icmp_type_text}, ttl: {ttl}"
+        print(summary_string)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 class SnifferWindow(MyWindow):
     def __init__(self):
@@ -279,8 +382,6 @@ class SnifferWindow(MyWindow):
         self.parameters_list = ['a', False]
         self.is_original = True
         self.check = True
-
-
 
     def send_stop_packet(self):
         self.stop_recording = True
@@ -300,7 +401,7 @@ class SnifferWindow(MyWindow):
 
     def process_packet(self, new_packet):
         new_packet = self.register_packet(new_packet)
-        self.add_packet_or_wait(new_packet)
+        self.add_packet(new_packet)
 
     def register_packet(self, new_packet):
         self.packet_count += 1
@@ -308,11 +409,8 @@ class SnifferWindow(MyWindow):
         self.packets.append(new_packet)
         return new_packet
 
-    def add_packet_or_wait(self, new_packet):
-        if self.is_original:
-            self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst)
-        else:
-            pass
+    def add_packet(self, new_packet):
+        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst)
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
@@ -330,8 +428,6 @@ class SnifferWindow(MyWindow):
             self.is_start_pressed = True
             sniff_thread = Thread(target=self.sniffing)
             sniff_thread.start()
-            live_sort_thread = Thread(target=self.live_sorted_packets)
-            live_sort_thread.start()
             self.change_record_buttons_color(self.is_start_pressed)
             self.recording_type = 'live'
             self.is_recording_saved = False
@@ -401,10 +497,6 @@ class SnifferWindow(MyWindow):
                 time.sleep(1)
                 print("recording not live")
 
-
-
-
-
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
         temp2 = self.parameters_list[1]
@@ -424,5 +516,3 @@ def window():
 
 if __name__ == "__main__":
     window()
-
-
