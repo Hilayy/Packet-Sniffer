@@ -8,9 +8,18 @@ from scapy.all import *
 from scapy.layers.inet import *
 from scapy.layers.tls import *
 import time
+from scapy.contrib.igmp import IGMP
+
 
 
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
+DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
+IGMP_TYPES = {
+        1: {17: "Membership Query", 18: "Membership Report"},
+        2: {17: "Membership Query", 22: "Membership Report", 23: "Leave Group"},
+        3: {17: "Membership Query, general", 18: "Membership Query, group-specific",
+            19: "Membership Reduction Message", 34: "Membership Report (Join)",
+            35: "Membership Report (Leave)"}}
 
 class MyWindow(QMainWindow):
     def __init__(self):
@@ -74,7 +83,7 @@ class MyWindow(QMainWindow):
 
         # Set font for header
         self.font = QtGui.QFont("Circular")
-        self.font.setPointSize(14)
+        self.font.setPointSize(12)
         self.tableWidget.horizontalHeader().setFont(self.font)
 
         header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
@@ -282,6 +291,9 @@ class Packet:
         return self.info.src, self.info.dst if self.info.dst != 'ff:ff:ff:ff:ff:ff' else 'Broadcast'
 
     def __configure_get_summary(self):
+        if "IGMP" in self.__get_protocol():
+            self.__get_summary_igmp()
+        return
         if self.protocol == "ARP":
             self.__get_summary_arp()
         if self.protocol == "UDP":
@@ -294,6 +306,13 @@ class Packet:
             self.__get_summary_icmp()
         if self.protocol == "ICMPv6":
             self.__get_summary_icmp6()
+        if self.protocol == "MDNS":
+            self.__get_summary_mdns()
+        if self.protocol == "DHCP":
+            self.__get_summary_dhcp()
+        if self.protocol == "SSDP":
+            self.__get_summary_ssdp()
+
 
 
     def __get_summary_arp(self):
@@ -364,6 +383,44 @@ class Packet:
         icmp6_type_text = re.findall(pattern, self.info.show(dump=True))[1]
         icmp6_type_text = icmp6_type_text[icmp6_type_text.index('=') + 2:]
         print(icmp6_type_text)
+
+    def __get_summary_mdns(self):
+        summary_string = ""
+        if self.info[DNS].qr == 0:
+            summary_string = "Query"
+        else:
+            summary_string = "Query Response"
+        print(summary_string)
+
+    def __get_summary_dhcp(self):
+        summary_string = ""
+        if self.info.haslayer(DHCP):
+            options = self.info[DHCP].options
+            for option in options:
+                if option[0] == 'message-type':
+                    summary_string = "DHCP " + DHCP_TYPES[option[1]]
+                    break
+        print(summary_string)
+
+    def __get_summary_ssdp(self):
+        summary_string = ""
+        payload = self.info.load.decode('utf-8', 'ignore')
+        summary_string = payload.splitlines()[0]
+        print(summary_string)
+
+    def __get_summary_igmp(self):
+        igmp_version = int(self.protocol[-1])
+        summary_string = ""
+        igmp_type = self.info[IGMP].type
+        try:
+            summary_string = IGMP_TYPES[igmp_version][igmp_type]
+        except Exception:
+            summary_string = ""
+        print(summary_string)
+
+
+
+
 
 
 
