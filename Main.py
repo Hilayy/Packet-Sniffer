@@ -10,26 +10,25 @@ from scapy.layers.tls import *
 import time
 from scapy.contrib.igmp import IGMP
 
-
-
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
 IGMP_TYPES = {
-        1: {17: "Membership Query", 18: "Membership Report"},
-        2: {17: "Membership Query", 22: "Membership Report", 23: "Leave Group"},
-        3: {17: "Membership Query, general", 18: "Membership Query, group-specific",
-            19: "Membership Reduction Message", 34: "Membership Report (Join)",
-            35: "Membership Report (Leave)"}}
+    1: {17: "Membership Query", 18: "Membership Report"},
+    2: {17: "Membership Query", 22: "Membership Report", 23: "Leave Group"},
+    3: {17: "Membership Query, general", 18: "Membership Query, group-specific",
+        19: "Membership Reduction Message", 34: "Membership Report (Join)",
+        35: "Membership Report (Leave)"}}
+
 
 class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
-        self.setGeometry(100, 100, 800, 500)
+        self.setGeometry(100, 100, 1000, 625)
         self.setWindowTitle("Sniffer")
         self.initUI()
         self.pdws = []
-        self.setMinimumWidth(800)
-        self.setMinimumHeight(500)
+        self.setMinimumWidth(1000)
+        self.setMinimumHeight(625)
 
     def initUI(self):
         # Start recording button
@@ -73,18 +72,28 @@ class MyWindow(QMainWindow):
             "QTableWidget { background-color: #313242; border: 1px solid #313242; }"
             "QTableCornerButton::section { background-color: #5c5e82; }"
         )
-        self.tableWidget.setColumnCount(4)
+        self.tableWidget.setColumnCount(5)
         self.tableWidget.setRowCount(0)
 
-        column_names = ["#", "Protocol", "Source", "Destination"]
+        column_names = ["#", "Protocol", "Source", "Destination", "Summary"]
         self.tableWidget.setHorizontalHeaderLabels(column_names)
         row_names = ["1"]
         self.tableWidget.setVerticalHeaderLabels(row_names)
 
+
+
+        self.font_summary = self.font = QtGui.QFont("Circular")
+        self.font.setPointSize(11)
+
         # Set font for header
         self.font = QtGui.QFont("Circular")
-        self.font.setPointSize(12)
+        self.font.setPointSize(14)
         self.tableWidget.horizontalHeader().setFont(self.font)
+
+
+
+
+
 
         header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
         self.tableWidget.horizontalHeader().setStyleSheet(header_stylesheet)
@@ -100,11 +109,11 @@ class MyWindow(QMainWindow):
 
         # Set up the table widget's properties
         self.tableWidget.setObjectName(u"tableWidget")
-        self.tableWidget.setGeometry(QtCore.QRect(0, 180, 801, 380))
+        self.tableWidget.setGeometry(QtCore.QRect(0, 180, 1001, 380))
         self.tableWidget.horizontalHeader().setCascadingSectionResizes(False)
-        self.tableWidget.setColumnWidth(0, 100)
-        for i in range(1, 4):
-            self.tableWidget.setColumnWidth(i, 233)
+        self.tableWidget.setColumnWidth(0, 50)
+        for i in range(1, 5):
+            self.tableWidget.setColumnWidth(i, 237)
 
         # Align column titles to the left
         for i in range(len(column_names)):
@@ -112,7 +121,7 @@ class MyWindow(QMainWindow):
             item.setTextAlignment(QtCore.Qt.AlignLeft)
             self.tableWidget.setHorizontalHeaderItem(i, item)
 
-    def add_to_table(self, number, protocol, src, dst):
+    def add_to_table(self, number, protocol, src, dst, summary):
         row_number = self.tableWidget.rowCount()
         self.tableWidget.insertRow(row_number)
         self.tableWidget.setRowHeight(row_number, 50)
@@ -143,6 +152,14 @@ class MyWindow(QMainWindow):
         if (self.tableWidget.verticalScrollBar().maximum() - self.tableWidget.verticalScrollBar().value() <= 7):
             self.tableWidget.verticalScrollBar().setValue(self.tableWidget.verticalScrollBar().maximum())
 
+        item_summary = QtWidgets.QTableWidgetItem(summary)
+        item_summary.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
+        item_summary.setFlags(QtCore.Qt.ItemIsEnabled | QtCore.Qt.ItemIsSelectable)  # Make item read-only
+        item_summary.setFont(self.font_summary)
+        self.tableWidget.setItem(row_number, 4, item_summary)
+        if (self.tableWidget.verticalScrollBar().maximum() - self.tableWidget.verticalScrollBar().value() <= 7):
+            self.tableWidget.verticalScrollBar().setValue(self.tableWidget.verticalScrollBar().maximum())
+
     def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
         super().resizeEvent(event)
         width = event.size().width()
@@ -150,8 +167,12 @@ class MyWindow(QMainWindow):
         self.adjust_table_size(width, height)
 
     def adjust_table_size(self, width, height):
-        for i in range(1, 4):
-            self.tableWidget.setColumnWidth(i, int((width - 100) / 3))
+        self.tableWidget.setColumnWidth(0, 50)
+        column_count = self.tableWidget.columnCount() - 1  # Excluding the "#" column
+        if column_count > 0:
+            column_width = (width - 50) // column_count
+            for i in range(1, self.tableWidget.columnCount()):
+                self.tableWidget.setColumnWidth(i, column_width)
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, width, height - 130))
 
     def change_record_buttons_color(self, is_pressed):
@@ -239,6 +260,7 @@ class Packet:
         self.length = self.__get_length()
         self.protocol = self.__get_protocol()
         self.src, self.dst = self.__get_ends()
+        self.summary = ""
         self.__configure_get_summary()
 
     def __get_length(self):
@@ -291,9 +313,6 @@ class Packet:
         return self.info.src, self.info.dst if self.info.dst != 'ff:ff:ff:ff:ff:ff' else 'Broadcast'
 
     def __configure_get_summary(self):
-        if "IGMP" in self.__get_protocol():
-            self.__get_summary_igmp()
-        return
         if self.protocol == "ARP":
             self.__get_summary_arp()
         if self.protocol == "UDP":
@@ -312,8 +331,8 @@ class Packet:
             self.__get_summary_dhcp()
         if self.protocol == "SSDP":
             self.__get_summary_ssdp()
-
-
+        if "IGMP" in self.__get_protocol():
+            self.__get_summary_igmp()
 
     def __get_summary_arp(self):
         opcode = self.info.op
@@ -326,7 +345,7 @@ class Packet:
             requested_ip_answer = self.info.psrc
             mac_of_ip = self.info.hwsrc
             summary_string = f"{requested_ip_answer} is at {mac_of_ip}"
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_udp(self):
         udp_segment = self.info[UDP]
@@ -334,7 +353,7 @@ class Packet:
         source_port = udp_segment.sport
         destination_port = udp_segment.dport
         summary_string = f"{source_port} -> {destination_port}, Payload size: {payload_size}"
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_tcp(self):
         tcp_segment = self.info[TCP]
@@ -347,7 +366,7 @@ class Packet:
             flags_string_list.append(TCP_FLAGS[flag])
         flags_string = ", ".join(flags_string_list)
         summary_string = f"{source_port} -> {destination_port}, [{flags_string}], Payload size: {payload_size} "
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_dns(self):
         dns_segment = self.info[DNS]
@@ -364,7 +383,7 @@ class Packet:
         is_error = dns_segment.rcode != 0
         if is_error:
             summary_string = "DNS Error"
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_icmp(self):
         icmp_segment = self.info[ICMP]
@@ -376,13 +395,13 @@ class Packet:
         ip_segment = self.info[IP]
         ttl = ip_segment.ttl
         summary_string = f"{icmp_type_text}, ttl: {ttl}"
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_icmp6(self):
         pattern = r'type {1,}=.{1,}'
         icmp6_type_text = re.findall(pattern, self.info.show(dump=True))[1]
         icmp6_type_text = icmp6_type_text[icmp6_type_text.index('=') + 2:]
-        print(icmp6_type_text)
+        self.summary = icmp6_type_text
 
     def __get_summary_mdns(self):
         summary_string = ""
@@ -390,7 +409,7 @@ class Packet:
             summary_string = "Query"
         else:
             summary_string = "Query Response"
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_dhcp(self):
         summary_string = ""
@@ -400,13 +419,13 @@ class Packet:
                 if option[0] == 'message-type':
                     summary_string = "DHCP " + DHCP_TYPES[option[1]]
                     break
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_ssdp(self):
         summary_string = ""
         payload = self.info.load.decode('utf-8', 'ignore')
         summary_string = payload.splitlines()[0]
-        print(summary_string)
+        self.summary = summary_string
 
     def __get_summary_igmp(self):
         igmp_version = int(self.protocol[-1])
@@ -416,16 +435,7 @@ class Packet:
             summary_string = IGMP_TYPES[igmp_version][igmp_type]
         except Exception:
             summary_string = ""
-        print(summary_string)
-
-
-
-
-
-
-
-
-
+        self.summary = summary_string
 
 
 class SnifferWindow(MyWindow):
@@ -468,7 +478,7 @@ class SnifferWindow(MyWindow):
         return new_packet
 
     def add_packet(self, new_packet):
-        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst)
+        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst, new_packet.summary)
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
@@ -525,7 +535,7 @@ class SnifferWindow(MyWindow):
         for packet in scapy_cap:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst, packet.summary)
             self.packets.append(packet)
         self.recording_type = 'import'
 
@@ -543,17 +553,8 @@ class SnifferWindow(MyWindow):
     def show_sorted_packets(self):
         self.clear_table()
         for packet in self.packets:
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst)
+            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst, packet.summary)
 
-    def live_sorted_packets(self):
-        while True:
-            if self.is_original is False and self.is_start_pressed:
-                self.sort_and_show()
-                time.sleep(2)
-                print(0)
-            else:
-                time.sleep(1)
-                print("recording not live")
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
