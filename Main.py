@@ -292,6 +292,8 @@ class Packet:
             self.__get_summary_dns()
         if self.protocol == "ICMP":
             self.__get_summary_icmp()
+        if self.protocol == "ICMPv6":
+            self.__get_summary_icmp6()
 
 
     def __get_summary_arp(self):
@@ -357,12 +359,11 @@ class Packet:
         summary_string = f"{icmp_type_text}, ttl: {ttl}"
         print(summary_string)
 
-
-
-
-
-
-
+    def __get_summary_icmp6(self):
+        pattern = r'type {1,}=.{1,}'
+        icmp6_type_text = re.findall(pattern, self.info.show(dump=True))[1]
+        icmp6_type_text = icmp6_type_text[icmp6_type_text.index('=') + 2:]
+        print(icmp6_type_text)
 
 
 
