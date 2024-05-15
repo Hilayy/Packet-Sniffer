@@ -81,15 +81,13 @@ class MyWindow(QMainWindow):
 
         column_names = ["#", "Protocol", "Source", "Destination", "Summary"]
         self.tableWidget.setHorizontalHeaderLabels(column_names)
-        row_names = ["1"]
-        self.tableWidget.setVerticalHeaderLabels(row_names)
 
         self.font_summary = self.font = QtGui.QFont("Circular")
         self.font.setPointSize(11)
 
         # Set font for header
         self.font = QtGui.QFont("Circular")
-        self.font.setPointSize(14)
+        self.font.setPointSize(13)
         self.tableWidget.horizontalHeader().setFont(self.font)
 
         header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
@@ -101,15 +99,20 @@ class MyWindow(QMainWindow):
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableWidget.verticalHeader().setVisible(False)
 
-        for i in range(self.tableWidget.columnCount()):
-            self.tableWidget.horizontalHeader().setSectionResizeMode(i, QtWidgets.QHeaderView.Stretch)
+        self.tableWidget.setColumnWidth(0, 100)
+        self.tableWidget.setColumnWidth(1, 100)
+        self.tableWidget.setColumnWidth(2, 267)
+        self.tableWidget.setColumnWidth(3, 267)
+        self.tableWidget.horizontalHeader().setSectionResizeMode(4, QtWidgets.QHeaderView.Stretch)
 
         # Set up the table widget's properties
         self.tableWidget.setObjectName(u"tableWidget")
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, 1001, 380))
         self.tableWidget.horizontalHeader().setCascadingSectionResizes(False)
-        self.tableWidget.setColumnWidth(0, 50)
-        for i in range(1, 5):
+        self.tableWidget.setColumnWidth(0, 100)
+        self.tableWidget.setColumnWidth(0, 200)
+
+        for i in range(2, 5):
             self.tableWidget.setColumnWidth(i, 237)
 
         # Align column titles to the left
@@ -164,12 +167,10 @@ class MyWindow(QMainWindow):
         self.adjust_table_size(width, height)
 
     def adjust_table_size(self, width, height):
-        self.tableWidget.setColumnWidth(0, 50)
-        column_count = self.tableWidget.columnCount() - 1  # Excluding the "#" column
-        if column_count > 0:
-            column_width = (width - 50) // column_count
-            for i in range(1, self.tableWidget.columnCount()):
-                self.tableWidget.setColumnWidth(i, column_width)
+        self.tableWidget.setColumnWidth(0, 100)
+        self.tableWidget.setColumnWidth(1, 100)
+        self.tableWidget.setColumnWidth(2, 267)
+        self.tableWidget.setColumnWidth(3, 267)
         self.tableWidget.setGeometry(QtCore.QRect(0, 180, width, height - 130))
 
     def change_record_buttons_color(self, is_pressed):
@@ -283,6 +284,8 @@ class Packet:
             if self.info[IPv6].nh == 58:
                 return "ICMPv6"
         if "DHCP" in str(self.info):
+            if self.info[UDP].sport == 546 or self.info[UDP].sport == 547:
+                return "DHCPv6"
             return "DHCP"
         if IP in self.info:
             proto_number = self.info[IP].proto
@@ -325,7 +328,7 @@ class Packet:
             self.__get_summary_icmp6()
         if self.protocol == "MDNS":
             self.__get_summary_mdns()
-        if self.protocol == "DHCP":
+        if "DHCP" in self.protocol:
             self.__get_summary_dhcp()
         if self.protocol == "SSDP":
             self.__get_summary_ssdp()
@@ -420,8 +423,11 @@ class Packet:
             for option in options:
                 if option[0] == 'message-type':
                     summary_string = "DHCP " + DHCP_TYPES[option[1]]
-                    break
-        self.summary = summary_string
+        else:
+            dhcp6_fields = str(self.info)
+            dhcp6_type = dhcp6_fields.split('/')[3]
+            dhcp6_type = "DHCPv6 " + dhcp6_type[7:]
+            self.summary = dhcp6_type
 
     def __get_summary_ssdp(self):
         summary_string = ""
