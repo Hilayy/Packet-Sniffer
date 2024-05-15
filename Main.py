@@ -9,6 +9,8 @@ from scapy.layers.inet import *
 from scapy.layers.tls import *
 import time
 from scapy.contrib.igmp import IGMP
+import binascii
+
 
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
@@ -18,6 +20,8 @@ IGMP_TYPES = {
     3: {17: "Membership Query, general", 18: "Membership Query, group-specific",
         19: "Membership Reduction Message", 34: "Membership Report (Join)",
         35: "Membership Report (Leave)"}}
+TLS_VERSIONS = {b'\x03\x01': '1', b'\x03\x02': '1.1', b'\x03\x03': '1.2', b'\x03\x04': '1.3'}
+TLS_TYPES = {20: 'Change Cipher Spec', 21: 'Alert', 22: 'Handshake', 23: 'Application Data', 24: 'Heartbeat'}
 
 
 class MyWindow(QMainWindow):
@@ -80,8 +84,6 @@ class MyWindow(QMainWindow):
         row_names = ["1"]
         self.tableWidget.setVerticalHeaderLabels(row_names)
 
-
-
         self.font_summary = self.font = QtGui.QFont("Circular")
         self.font.setPointSize(11)
 
@@ -89,11 +91,6 @@ class MyWindow(QMainWindow):
         self.font = QtGui.QFont("Circular")
         self.font.setPointSize(14)
         self.tableWidget.horizontalHeader().setFont(self.font)
-
-
-
-
-
 
         header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
         self.tableWidget.horizontalHeader().setStyleSheet(header_stylesheet)
@@ -268,10 +265,11 @@ class Packet:
 
     def __get_protocol(self):
         if self.info.haslayer(TCP):
-            if self.info.haslayer(Raw):  # Raw layer often encapsulates TLS
+            if self.info.haslayer(Raw):
                 raw_data = self.info.getlayer(Raw).load
-                if raw_data.startswith(b'\x16\x03'):  # TLS starts with 0x16 0x03
-                    return "TLSvX"
+                version = raw_data[1:3]
+                if version in TLS_VERSIONS.keys():
+                    return "TLSv" + TLS_VERSIONS[version]
         if TCP in self.info and self.info.haslayer(Raw):
             raw_data = self.info[Raw].load.decode('utf-8', 'ignore')
             if "HTTP" in raw_data:
@@ -331,8 +329,12 @@ class Packet:
             self.__get_summary_dhcp()
         if self.protocol == "SSDP":
             self.__get_summary_ssdp()
-        if "IGMP" in self.__get_protocol():
+        if "IGMP" in self.protocol:
             self.__get_summary_igmp()
+        if "TLS" in self.protocol:
+            self.__get_summary_tls()
+        if self.protocol == "HTTP":
+            self.__get_summary_http()
 
     def __get_summary_arp(self):
         opcode = self.info.op
@@ -437,6 +439,24 @@ class Packet:
             summary_string = ""
         self.summary = summary_string
 
+    def __get_summary_tls(self):
+        summary_string = ""
+        raw_data = self.info.getlayer(Raw).load
+        type_field = raw_data[0]
+        summary_string += TLS_TYPES[type_field]
+        if type_field == 22:  # handshake
+            if raw_data[5] == 1:
+                summary_string = "Client Hello"
+            else:
+                summary_string = "Server Hello"
+        self.summary = summary_string
+
+    def __get_summary_http(self):
+        http_data = self.info.getlayer(Raw).load.decode('utf-8', 'ignore')
+        self.summary = http_data.splitlines()[0]
+
+
+
 
 class SnifferWindow(MyWindow):
     def __init__(self):
@@ -478,7 +498,8 @@ class SnifferWindow(MyWindow):
         return new_packet
 
     def add_packet(self, new_packet):
-        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst, new_packet.summary)
+        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst,
+                          new_packet.summary)
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
@@ -554,7 +575,6 @@ class SnifferWindow(MyWindow):
         self.clear_table()
         for packet in self.packets:
             self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst, packet.summary)
-
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
