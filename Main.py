@@ -1,7 +1,7 @@
 import re
 import sys
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog, QLineEdit
 from PyQt5 import QtCore, QtGui
 from threading import Thread, Event, Lock
 from scapy.all import *
@@ -10,7 +10,6 @@ from scapy.layers.tls import *
 import time
 from scapy.contrib.igmp import IGMP
 import binascii
-
 
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
@@ -54,23 +53,36 @@ class MyWindow(QMainWindow):
         # Save button
         self.saveButton = QtWidgets.QPushButton(self)
         self.saveButton.setObjectName("SaveButton")
-        self.saveButton.setGeometry(QtCore.QRect(90, 20, 70, 23))
-        self.saveButton.setStyleSheet(u"background-color:rgb(92, 94, 130)")
-        self.saveButton.setText("Save")
+        self.saveButton.setGeometry(QtCore.QRect(80, 17, 60, 30))
+        self.saveButton.setStyleSheet(u"background-color:transparent;")
         font = QtGui.QFont("Circular", 10)
         self.saveButton.setFont(font)
         self.saveButton.clicked.connect(self.save_recording)
+        save_icon = QtGui.QIcon('Images/save_icon.png')
+        self.saveButton.setIcon(save_icon)
+        self.saveButton.setIconSize(save_icon.actualSize(QtCore.QSize(32, 32)))
 
         # Import Button
         self.importButton = QtWidgets.QPushButton(self)
         self.importButton.setObjectName("ImportButton")
-        self.importButton.setGeometry(QtCore.QRect(10, 20, 70, 23))
-        self.importButton.setStyleSheet(u"background-color:rgb(92, 94, 130)")
-        self.importButton.setText("Import")
+        self.importButton.setGeometry(QtCore.QRect(10, 12, 70, 40))
+        self.importButton.setStyleSheet(u"background-color:transparent")
         font = QtGui.QFont("Circular", 10)
         self.importButton.setFont(font)
         self.importButton.clicked.connect(self.import_recording)
+        import_icon = QtGui.QIcon('Images/import_icon.png')
+        self.importButton.setIcon(import_icon)
+        self.importButton.setIconSize(import_icon.actualSize(QtCore.QSize(35, 35)))
 
+        # View filter search bar
+        self.search_bar = QLineEdit(self)
+        self.search_bar.setGeometry(QtCore.QRect(10, 140, 230, 30))
+        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
+        self.search_bar.setPlaceholderText("Search...")
+        self.search_bar.setVisible(True)
+        self.search_bar.returnPressed.connect(self.handle_filter_search)
+
+        # table
         self.tableWidget = QtWidgets.QTableWidget(self)
         self.tableWidget.setStyleSheet(
             "QTableWidget { background-color: #313242; border: 1px solid #313242; }"
@@ -121,10 +133,16 @@ class MyWindow(QMainWindow):
             item.setTextAlignment(QtCore.Qt.AlignLeft)
             self.tableWidget.setHorizontalHeaderItem(i, item)
 
-    def add_to_table(self, number, protocol, src, dst, summary):
+    def add_to_table(self, packet):
         row_number = self.tableWidget.rowCount()
         self.tableWidget.insertRow(row_number)
         self.tableWidget.setRowHeight(row_number, 50)
+
+        number = str(packet.number)
+        protocol = packet.protocol
+        src = packet.src
+        dst = packet.dst
+        summary = packet.summary
 
         item_number = QtWidgets.QTableWidgetItem(number)
         item_number.setForeground(QtGui.QColor(QtCore.Qt.white))  # Change text color to white
@@ -165,13 +183,14 @@ class MyWindow(QMainWindow):
         width = event.size().width()
         height = event.size().height()
         self.adjust_table_size(width, height)
+        self.search_bar.setFixedWidth(width - 20)
 
     def adjust_table_size(self, width, height):
         self.tableWidget.setColumnWidth(0, 100)
         self.tableWidget.setColumnWidth(1, 100)
         self.tableWidget.setColumnWidth(2, 267)
         self.tableWidget.setColumnWidth(3, 267)
-        self.tableWidget.setGeometry(QtCore.QRect(0, 180, width, height - 130))
+        self.tableWidget.setGeometry(QtCore.QRect(0, 180, width, height - 180))
 
     def change_record_buttons_color(self, is_pressed):
         start_color = "(9, 195, 9)" if not is_pressed else "(109, 125, 109)"
@@ -236,6 +255,12 @@ class MyWindow(QMainWindow):
             self.parameters_list[0] = parameter
             self.parameters_list[1] = False
         self.sort_and_show()
+
+    def handle_filter_search(self):
+        search_string = self.search_bar.text()
+        search_string = search_string.replace(' ', '')
+        search_list = search_string.split('or')
+        self.find_matching_packets(search_list)
 
 
 class PacketDetailsWindow(QtWidgets.QWidget):
@@ -449,7 +474,10 @@ class Packet:
         summary_string = ""
         raw_data = self.info.getlayer(Raw).load
         type_field = raw_data[0]
-        summary_string += TLS_TYPES[type_field]
+        if type_field in TLS_TYPES.keys():
+            summary_string += TLS_TYPES[type_field]
+        else:
+            print(self.info)
         if type_field == 22:  # handshake
             if raw_data[5] == 1:
                 summary_string = "Client Hello"
@@ -460,8 +488,6 @@ class Packet:
     def __get_summary_http(self):
         http_data = self.info.getlayer(Raw).load.decode('utf-8', 'ignore')
         self.summary = http_data.splitlines()[0]
-
-
 
 
 class SnifferWindow(MyWindow):
@@ -476,6 +502,8 @@ class SnifferWindow(MyWindow):
         self.parameters_list = ['a', False]
         self.is_original = True
         self.check = True
+        self.filtered_packets = []
+        self.filter = None
 
     def send_stop_packet(self):
         self.stop_recording = True
@@ -504,8 +532,11 @@ class SnifferWindow(MyWindow):
         return new_packet
 
     def add_packet(self, new_packet):
-        self.add_to_table(str(new_packet.number), new_packet.protocol, new_packet.src, new_packet.dst,
-                          new_packet.summary)
+        if self.filter is None:
+            self.add_to_table(new_packet)
+        else:
+            print(self.filter)
+            self.add_packet_if_matching(new_packet)
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
@@ -532,7 +563,7 @@ class SnifferWindow(MyWindow):
         self.clear_table()
 
     def save_recording(self):
-        if not self.is_start_pressed:
+        if not self.is_start_pressed and self.packets != []:
             self.file_save_menu()
             if self.save_file_name == "":
                 return
@@ -562,7 +593,7 @@ class SnifferWindow(MyWindow):
         for packet in scapy_cap:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst, packet.summary)
+            self.add_to_table(packet)
             self.packets.append(packet)
         self.recording_type = 'import'
 
@@ -580,7 +611,7 @@ class SnifferWindow(MyWindow):
     def show_sorted_packets(self):
         self.clear_table()
         for packet in self.packets:
-            self.add_to_table(str(packet.number), packet.protocol, packet.src, packet.dst, packet.summary)
+            self.add_to_table(packet)
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
@@ -588,6 +619,28 @@ class SnifferWindow(MyWindow):
         self.parameters_list = ["number", False]
         self.sort_by_parameter()
         self.parameters_list = [temp1, temp2]
+
+    def find_matching_packets(self, search_list: list):
+        if search_list == ['']:
+            self.filter = None
+            self.filtered_packets = []
+            self.restore_packets()
+            return
+        self.filter = search_list
+        self.clear_table()
+        for packet in self.packets:
+            self.add_packet_if_matching(packet)
+
+
+    def add_packet_if_matching(self, packet):
+        if packet.protocol.lower() in self.filter:
+            self.filtered_packets.append(packet)
+            self.add_to_table(packet)
+
+    def restore_packets(self):
+        self.clear_table()
+        for packet in self.packets:
+            self.add_to_table(packet)
 
 
 def window():
