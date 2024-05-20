@@ -78,7 +78,7 @@ class MyWindow(QMainWindow):
         self.search_bar = QLineEdit(self)
         self.search_bar.setGeometry(QtCore.QRect(10, 140, 230, 30))
         self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
-        self.search_bar.setPlaceholderText("Search...")
+        self.search_bar.setPlaceholderText("Filter by protocol...")
         self.search_bar.setVisible(True)
         self.search_bar.returnPressed.connect(self.handle_filter_search)
 
@@ -201,10 +201,13 @@ class MyWindow(QMainWindow):
         self.stopRecord.setStyleSheet(stop_string)
 
     def open_packet_details(self, item):
-        pd = self.packets[item.row()].info.show(dump=True)
-        number = self.packets[item.row()].number
-        pdw = PacketDetailsWindow(pd, number)
+        packet_number = self.tableWidget.item(item.row(), 0)
+        packet_number = int(packet_number.text())
+        layers_dict = self.packets[packet_number - 1].get_layer_info()
+        pd = self.packets[packet_number - 1].info.show(dump=True)
+        pdw = PacketDetailsWindow(layers_dict, packet_number)
         self.pdws.append(pdw)
+        pdw.setStyleSheet("background-color: #313242;")
         pdw.show()
 
     def show_popup(self):
@@ -247,6 +250,8 @@ class MyWindow(QMainWindow):
         self.tableWidget.setRowCount(0)
 
     def header_clicked(self, col_num):
+        if col_num == 4:  # if parameter is summary, which is not sortable
+            return
         parameter_list = ["number", "protocol", "src", "dst"]
         parameter = parameter_list[col_num]
         if self.parameters_list[0] == parameter:
@@ -264,16 +269,36 @@ class MyWindow(QMainWindow):
 
 
 class PacketDetailsWindow(QtWidgets.QWidget):
-    def __init__(self, text, number):
+    def __init__(self, layers_dict, number):
         super().__init__()
-        self.text = str(text)
+        self.layers_dict = layers_dict
         self.number = number
         self.initUI()
 
     def initUI(self):
         self.setWindowTitle(f'Packet {self.number}')
         self.setGeometry(400, 100, 500, 400)
-        self.label = QtWidgets.QLabel(self.text, self)
+        self.buttons = []
+        num1 = int((500 / len(self.layers_dict.keys())))
+        num2 = num1 * -1
+        for key in self.layers_dict.keys():
+            button = QtWidgets.QPushButton(self)
+            num2 += num1
+            button.setGeometry(QtCore.QRect(num2, 5, num1, 30))
+            button.setStyleSheet("background-color: #5c5e82;")
+            button.setText(key)
+            # Use a default argument in lambda to capture the current value of key
+            button.clicked.connect(lambda checked, key=key: self.layer_clicked(self.layers_dict[key]))
+            self.buttons.append(button)
+
+    def layer_clicked(self, info):
+        fields = QVBoxLayout()
+        rows = info.split('\n')
+        for row in rows:
+            print(row)
+
+
+
 
 
 class Packet:
@@ -489,6 +514,16 @@ class Packet:
         http_data = self.info.getlayer(Raw).load.decode('utf-8', 'ignore')
         self.summary = http_data.splitlines()[0]
 
+    def get_layer_info(self):
+        layers_dict = {}
+        pattern = r'###\[.{1,}]###'
+        show = self.info.show(dump=True)
+        layers = [x[5:-5] for x in re.findall(pattern, show)]
+        parts = re.split(pattern, show)[1:]  # 0 index in None
+        layers_dict['Ethernet'] = parts[0]
+        layers_dict[layers[1]] = parts[1]
+        return layers_dict
+
 
 class SnifferWindow(MyWindow):
     def __init__(self):
@@ -535,7 +570,6 @@ class SnifferWindow(MyWindow):
         if self.filter is None:
             self.add_to_table(new_packet)
         else:
-            print(self.filter)
             self.add_packet_if_matching(new_packet)
 
     def start_sniffing(self):
@@ -605,13 +639,21 @@ class SnifferWindow(MyWindow):
         self.is_original = self.parameters_list[0] == "number" and self.parameters_list[1] is False
 
     def sort_by_parameter(self):
-        self.packets = sorted(self.packets, key=lambda obj: getattr(obj, self.parameters_list[0]),
-                              reverse=self.parameters_list[1])
+        if not self.filtered_packets:
+            self.packets = sorted(self.packets, key=lambda obj: getattr(obj, self.parameters_list[0]),
+                                  reverse=self.parameters_list[1])
+        else:
+            self.filtered_packets = sorted(self.filtered_packets, key=lambda obj: getattr(obj, self.parameters_list[0]),
+                                           reverse=self.parameters_list[1])
 
     def show_sorted_packets(self):
         self.clear_table()
-        for packet in self.packets:
-            self.add_to_table(packet)
+        if not self.filtered_packets:
+            for packet in self.packets:
+                self.add_to_table(packet)
+        else:
+            for packet in self.filtered_packets:
+                self.add_to_table(packet)
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
@@ -630,7 +672,6 @@ class SnifferWindow(MyWindow):
         self.clear_table()
         for packet in self.packets:
             self.add_packet_if_matching(packet)
-
 
     def add_packet_if_matching(self, packet):
         if packet.protocol.lower() in self.filter:
