@@ -39,8 +39,8 @@ class MyWindow(QMainWindow):
         # Start recording button
         self.startRecord = QtWidgets.QPushButton(self)
         self.startRecord.setObjectName("StartRecord")
-        self.startRecord.setGeometry(QtCore.QRect(170, 20, 23, 23))
-        self.startRecord.setStyleSheet(u"background-color:rgb(9, 195, 9)")
+        self.startRecord.setGeometry(QtCore.QRect(160, 15, 30, 30))
+        self.startRecord.setStyleSheet(u"background-color:rgb(9, 195, 9);border-radius: 15px;")
         self.startRecord.clicked.connect(self.start_sniffing)
         self.start_recording_again = 0
         self.save_file_name = ""
@@ -48,8 +48,8 @@ class MyWindow(QMainWindow):
         # Stop recording button
         self.stopRecord = QtWidgets.QPushButton(self)
         self.stopRecord.setObjectName("StopRecord")
-        self.stopRecord.setGeometry(QtCore.QRect(210, 20, 23, 23))
-        self.stopRecord.setStyleSheet(u"background-color:rgb(125, 112, 112)")
+        self.stopRecord.setGeometry(QtCore.QRect(210, 15, 30, 30))
+        self.stopRecord.setStyleSheet(u"background-color:rgb(125, 112, 112);border-radius: 15px;")
         self.stopRecord.clicked.connect(self.send_stop_packet)
 
         # Save button
@@ -197,11 +197,9 @@ class MyWindow(QMainWindow):
 
     def change_record_buttons_color(self, is_pressed):
         start_color = "(9, 195, 9)" if not is_pressed else "(109, 125, 109)"
-        start_string = "background-color:rgb" + start_color
-        self.startRecord.setStyleSheet(start_string)
+        self.startRecord.setStyleSheet(f"background-color:rgb{start_color};border-radius: 15px;")
         stop_color = "(255, 19, 19)" if is_pressed else "(125, 112, 112)"
-        stop_string = "background-color:rgb" + stop_color
-        self.stopRecord.setStyleSheet(stop_string)
+        self.stopRecord.setStyleSheet(f"background-color:rgb{stop_color};border-radius: 15px;")
 
     def open_packet_details(self, item):
         packet_number = self.tableWidget.item(item.row(), 0)
