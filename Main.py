@@ -11,6 +11,7 @@ import time
 from scapy.contrib.igmp import IGMP
 import binascii
 
+PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp', 'tls', 'http']
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
 IGMP_TYPES = {
@@ -27,11 +28,12 @@ class MyWindow(QMainWindow):
     def __init__(self):
         super(MyWindow, self).__init__()
         self.setGeometry(100, 100, 1000, 625)
-        self.setWindowTitle("Sniffer")
+        self.setWindowTitle("CableDolphin")
         self.initUI()
         self.pdws = []
         self.setMinimumWidth(1000)
         self.setMinimumHeight(625)
+        self.is_search_valid = False
 
     def initUI(self):
         # Start recording button
@@ -81,6 +83,7 @@ class MyWindow(QMainWindow):
         self.search_bar.setPlaceholderText("Filter by protocol...")
         self.search_bar.setVisible(True)
         self.search_bar.returnPressed.connect(self.handle_filter_search)
+        self.search_bar.textChanged.connect(self.check_valid_search_term)
 
         # table
         self.tableWidget = QtWidgets.QTableWidget(self)
@@ -262,10 +265,40 @@ class MyWindow(QMainWindow):
         self.sort_and_show()
 
     def handle_filter_search(self):
+        if not self.is_search_valid:
+            return
         search_string = self.search_bar.text()
         search_string = search_string.replace(' ', '')
         search_list = search_string.split('or')
         self.find_matching_packets(search_list)
+
+    def check_valid_search_term(self):
+        search_string = self.search_bar.text()
+        if all([x == ' ' or x == '' for x in search_string]):
+            self.reset_search_bar()
+            return
+        if not all([x.islower() or x.isnumeric() or x == ' ' for x in search_string]):
+            self.handle_invalid_search_term()
+            return
+        search_string = search_string.replace(' ', '')
+        search_list = search_string.split('or')
+        if not all([x in PROTOCOLS for x in search_list]):
+            self.handle_invalid_search_term()
+            return
+        self.handle_valid_search_term()
+
+    def handle_invalid_search_term(self):
+        self.is_search_valid = False
+        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:#ff2929;")
+
+    def handle_valid_search_term(self):
+        self.is_search_valid = True
+        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:#37f05c")
+
+    def reset_search_bar(self):
+        self.is_search_valid = True
+        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
+
 
 
 class PacketDetailsWindow(QtWidgets.QWidget):
@@ -292,13 +325,13 @@ class PacketDetailsWindow(QtWidgets.QWidget):
             self.buttons.append(button)
 
     def layer_clicked(self, info):
-        fields = QVBoxLayout()
-        rows = info.split('\n')
-        for row in rows:
-            print(row)
+        label = QtWidgets.QLabel(info, self)
+        font = font = QtGui.QFont("Circular")
+        font.setPointSize(11)
+        label.setFont(font)
+        label.setGeometry(QtCore.QRect(0, 50, 400, 300))
 
-
-
+        label.setVisible(True)
 
 
 class Packet:
@@ -501,8 +534,6 @@ class Packet:
         type_field = raw_data[0]
         if type_field in TLS_TYPES.keys():
             summary_string += TLS_TYPES[type_field]
-        else:
-            print(self.info)
         if type_field == 22:  # handshake
             if raw_data[5] == 1:
                 summary_string = "Client Hello"
