@@ -9,7 +9,6 @@ from scapy.layers.inet import *
 from scapy.layers.tls import *
 import time
 from scapy.contrib.igmp import IGMP
-import binascii
 
 PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp', 'tls', 'http']
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
@@ -24,9 +23,9 @@ TLS_VERSIONS = {b'\x03\x01': '1', b'\x03\x02': '1.1', b'\x03\x03': '1.2', b'\x03
 TLS_TYPES = {20: 'Change Cipher Spec', 21: 'Alert', 22: 'Handshake', 23: 'Application Data', 24: 'Heartbeat'}
 
 
-class MyWindow(QMainWindow):
+class Gui(QMainWindow):
     def __init__(self):
-        super(MyWindow, self).__init__()
+        super(Gui, self).__init__()
         self.setGeometry(100, 100, 1000, 625)
         self.setWindowTitle("CableDolphin")
         self.initUI()
@@ -34,6 +33,10 @@ class MyWindow(QMainWindow):
         self.setMinimumWidth(1000)
         self.setMinimumHeight(625)
         self.is_search_valid = False
+        self.dialog_result = 0
+        self.save_file_name = ''
+        self.packet_number = -1
+        self.search_list = ''
 
     def initUI(self):
         # Start recording button
@@ -41,16 +44,12 @@ class MyWindow(QMainWindow):
         self.startRecord.setObjectName("StartRecord")
         self.startRecord.setGeometry(QtCore.QRect(160, 15, 30, 30))
         self.startRecord.setStyleSheet(u"background-color:rgb(9, 195, 9);border-radius: 15px;")
-        self.startRecord.clicked.connect(self.start_sniffing)
-        self.start_recording_again = 0
-        self.save_file_name = ""
 
         # Stop recording button
         self.stopRecord = QtWidgets.QPushButton(self)
         self.stopRecord.setObjectName("StopRecord")
         self.stopRecord.setGeometry(QtCore.QRect(210, 15, 30, 30))
         self.stopRecord.setStyleSheet(u"background-color:rgb(125, 112, 112);border-radius: 15px;")
-        self.stopRecord.clicked.connect(self.send_stop_packet)
 
         # Save button
         self.saveButton = QtWidgets.QPushButton(self)
@@ -59,7 +58,6 @@ class MyWindow(QMainWindow):
         self.saveButton.setStyleSheet(u"background-color:transparent;")
         font = QtGui.QFont("Circular", 10)
         self.saveButton.setFont(font)
-        self.saveButton.clicked.connect(self.save_recording)
         save_icon = QtGui.QIcon('Images/save_icon.png')
         self.saveButton.setIcon(save_icon)
         self.saveButton.setIconSize(save_icon.actualSize(QtCore.QSize(32, 32)))
@@ -71,7 +69,6 @@ class MyWindow(QMainWindow):
         self.importButton.setStyleSheet(u"background-color:transparent")
         font = QtGui.QFont("Circular", 10)
         self.importButton.setFont(font)
-        self.importButton.clicked.connect(self.import_recording)
         import_icon = QtGui.QIcon('Images/import_icon.png')
         self.importButton.setIcon(import_icon)
         self.importButton.setIconSize(import_icon.actualSize(QtCore.QSize(35, 35)))
@@ -82,8 +79,6 @@ class MyWindow(QMainWindow):
         self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
         self.search_bar.setPlaceholderText("Filter by protocol...")
         self.search_bar.setVisible(True)
-        self.search_bar.returnPressed.connect(self.handle_filter_search)
-        self.search_bar.textChanged.connect(self.check_valid_search_term)
 
         # table
         self.tableWidget = QtWidgets.QTableWidget(self)
@@ -109,7 +104,6 @@ class MyWindow(QMainWindow):
         self.tableWidget.horizontalHeader().setStyleSheet(header_stylesheet)
         self.tableWidget.verticalHeader().setStyleSheet(header_stylesheet)
 
-        self.tableWidget.itemDoubleClicked.connect(self.open_packet_details)
         self.tableWidget.horizontalHeader().sectionClicked.connect(self.header_clicked)
         self.tableWidget.setSelectionMode(QtWidgets.QAbstractItemView.NoSelection)
         self.tableWidget.verticalHeader().setVisible(False)
@@ -201,11 +195,11 @@ class MyWindow(QMainWindow):
         stop_color = "(255, 19, 19)" if is_pressed else "(125, 112, 112)"
         self.stopRecord.setStyleSheet(f"background-color:rgb{stop_color};border-radius: 15px;")
 
-    def open_packet_details(self, item):
+    def open_packet_details(self, item, packets):
         packet_number = self.tableWidget.item(item.row(), 0)
         packet_number = int(packet_number.text())
-        layers_dict = self.packets[packet_number - 1].get_layer_info()
-        pd = self.packets[packet_number - 1].info.show(dump=True)
+        layers_dict = packets[packet_number - 1].get_layer_info()
+        pd = packets[packet_number - 1].info.show(dump=True)
         pdw = PacketDetailsWindow(layers_dict, packet_number)
         self.pdws.append(pdw)
         pdw.setStyleSheet("background-color: #313242;")
@@ -221,19 +215,20 @@ class MyWindow(QMainWindow):
         msg.buttonClicked.connect(self.popup_button)
         msg.rejected.connect(self.popup_rejected)
         x = msg.exec_()
+        return self.dialog_result
 
     def popup_button(self, i):
         if i.text() == "Save":
-            self.start_recording_again = 1
             self.file_save_menu()
+            self.dialog_result = 1
 
         if i.text() == "Ignore":
-            self.start_recording_again = 2
+            self.dialog_result = 2
         if i.text() == "Cancel":
-            self.start_recording_again = 0
+            self.dialog_result = 0
 
     def popup_rejected(self):
-        self.start_recording_again = 0
+        self.dialog_result = 0
 
     def file_save_menu(self):
         desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -262,13 +257,7 @@ class MyWindow(QMainWindow):
             self.parameters_list[1] = False
         self.sort_and_show()
 
-    def handle_filter_search(self):
-        if not self.is_search_valid:
-            return
-        search_string = self.search_bar.text()
-        search_string = search_string.replace(' ', '')
-        search_list = search_string.split('or')
-        self.find_matching_packets(search_list)
+
 
     def check_valid_search_term(self):
         search_string = self.search_bar.text()
@@ -297,6 +286,22 @@ class MyWindow(QMainWindow):
         self.is_search_valid = True
         self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
 
+    def closeEvent(self, event):
+        if self.is_start_pressed:
+            dialog = QDialog(self)
+            msgBox = QMessageBox(dialog)
+            msgBox.setWindowTitle("Quitting?")
+            msgBox.setText("A recording is currently live, are you sure you want to exit the application?")
+            reply = msgBox.question(self, 'Quitting?', 'A recording is currently live, are you sure you want to '
+                                                       'exit the application?',
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+            if reply == QMessageBox.Yes:
+                self.send_stop_packet()
+                sys.exit(0)
+            else:
+                event.ignore()
+        else:
+            event.accept()
 
 
 class PacketDetailsWindow(QtWidgets.QWidget):
@@ -554,9 +559,9 @@ class Packet:
         return layers_dict
 
 
-class SnifferWindow(MyWindow):
-    def __init__(self):
-        super().__init__()
+class Sniffer:
+    def __init__(self, gui: Gui):
+        self.gui = gui
         self.is_start_pressed = False
         self.packets = []
         self.recording_type = ''
@@ -568,6 +573,26 @@ class SnifferWindow(MyWindow):
         self.check = True
         self.filtered_packets = []
         self.filter = None
+        self.setup_gui()
+        self.save_file_name = ''
+
+    def setup_gui(self):
+        self.gui.startRecord.clicked.connect(self.start_sniffing)
+        self.gui.stopRecord.clicked.connect(self.send_stop_packet)
+        self.gui.saveButton.clicked.connect(self.save_recording)
+        self.gui.importButton.clicked.connect(self.import_recording)
+        self.gui.tableWidget.itemDoubleClicked.connect(lambda item: self.gui.open_packet_details(item, self.packets))
+        self.gui.search_bar.textChanged.connect(self.gui.check_valid_search_term)
+        self.gui.search_bar.returnPressed.connect(self.handle_filter_search)
+
+    def handle_filter_search(self):
+        if not self.gui.is_search_valid:
+            return
+        search_string = self.gui.search_bar.text()
+        search_string = search_string.replace(' ', '')
+        search_list = search_string.split('or')
+        self.gui.search_list = search_list
+        self.find_matching_packets(search_list)
 
     def send_stop_packet(self):
         self.stop_recording = True
@@ -575,7 +600,7 @@ class SnifferWindow(MyWindow):
         self.check = False
         if not self.is_original:
             self.sort_and_show()
-        self.change_record_buttons_color(self.is_start_pressed)
+        self.gui.change_record_buttons_color(self.is_start_pressed)
 
     def stopfilter(self, x):
         return self.stop_recording
@@ -597,14 +622,15 @@ class SnifferWindow(MyWindow):
 
     def add_packet(self, new_packet):
         if self.filter is None:
-            self.add_to_table(new_packet)
+            self.gui.add_to_table(new_packet)
         else:
             self.add_packet_if_matching(new_packet)
 
     def start_sniffing(self):
         if self.is_start_pressed is False:
             if self.packets != [] and self.is_recording_saved is False and self.recording_type == 'live':
-                self.show_popup()
+                self.start_recording_again = self.gui.show_popup()
+                self.save_file_name = self.gui.save_file_name
                 if self.start_recording_again == 0 or self.save_file_name != "":
                     return
                 if self.start_recording_again == 1:
@@ -616,18 +642,20 @@ class SnifferWindow(MyWindow):
             self.parameters_list = ['a', False]  # reset sort parameters
             self.is_start_pressed = True
             sniff_thread = Thread(target=self.sniffing)
+
             sniff_thread.start()
-            self.change_record_buttons_color(self.is_start_pressed)
+            self.gui.change_record_buttons_color(self.is_start_pressed)
             self.recording_type = 'live'
             self.is_recording_saved = False
 
     def clear_packets(self):
         self.packets = []
-        self.clear_table()
+        self.gui.clear_table()
 
     def save_recording(self):
         if not self.is_start_pressed and self.packets != []:
-            self.file_save_menu()
+            self.gui.file_save_menu()
+            self.save_file_name = self.gui.save_file_name
             if self.save_file_name == "":
                 return
             self.save_recording_to_file()
@@ -642,12 +670,12 @@ class SnifferWindow(MyWindow):
         if self.is_start_pressed:
             return
         if not self.is_recording_saved and self.packets != [] and self.recording_type == 'live':
-            self.show_popup()
+            self.gui.show_popup()
             if (self.start_recording_again == 0 or self.save_file_name == "") and self.start_recording_again != 2:
                 return
             if self.start_recording_again == 1:
                 self.save_recording_to_file()
-        file_name = self.file_import_menu()
+        file_name = self.gui.file_import_menu()
         if '.pcap' not in file_name:
             return
         self.clear_packets()
@@ -656,7 +684,7 @@ class SnifferWindow(MyWindow):
         for packet in scapy_cap:
             self.packet_count += 1
             packet = Packet(self.packet_count, packet)
-            self.add_to_table(packet)
+            self.gui.add_to_table(packet)
             self.packets.append(packet)
         self.recording_type = 'import'
 
@@ -676,13 +704,13 @@ class SnifferWindow(MyWindow):
                                            reverse=self.parameters_list[1])
 
     def show_sorted_packets(self):
-        self.clear_table()
+        self.gui.clear_table()
         if not self.filtered_packets:
             for packet in self.packets:
-                self.add_to_table(packet)
+                self.gui.add_to_table(packet)
         else:
             for packet in self.filtered_packets:
-                self.add_to_table(packet)
+                self.gui.add_to_table(packet)
 
     def reset_packet_order(self):
         temp1 = self.parameters_list[0]
@@ -698,29 +726,33 @@ class SnifferWindow(MyWindow):
             self.restore_packets()
             return
         self.filter = search_list
-        self.clear_table()
+        self.gui.clear_table()
         for packet in self.packets:
             self.add_packet_if_matching(packet)
 
     def add_packet_if_matching(self, packet):
         if packet.protocol.lower() in self.filter:
             self.filtered_packets.append(packet)
-            self.add_to_table(packet)
+            self.gui.add_to_table(packet)
 
     def restore_packets(self):
-        self.clear_table()
+        self.gui.clear_table()
         for packet in self.packets:
-            self.add_to_table(packet)
+            self.gui.add_to_table(packet)
 
 
 def window():
     # set window and window properties
     app = QApplication(sys.argv)
-    win = SnifferWindow()
-    win.setStyleSheet("background-color: #1d1e29;")
-    win.show()
+    win = Sniffer(Gui())
+    win.gui.setStyleSheet("background-color: #1d1e29;")
+    win.gui.show()
     sys.exit(app.exec_())
 
 
 if __name__ == "__main__":
-    window()
+    try:
+        window()
+    except Exception as e:
+        print(e.args)
+        sys.exit(0)
