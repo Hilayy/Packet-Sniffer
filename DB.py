@@ -2,7 +2,7 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 
-class DBClient:
+class DB:
     def __init__(self):
         cred = credentials.Certificate(
             r'C:\Users\User\Desktop\packet-sniffer-b79f1-firebase-adminsdk-g5i8w-c5bc92d810.json')
@@ -28,10 +28,7 @@ class DBClient:
         return user_dict['password'] == password
 
 
-db = DBClient()
 
-user = ['hilay', 'changeme']
-result = db.username_exists(user[0])
-if result is not None:
-    print(db.password_matches(result, user[1]))
+
+
 
