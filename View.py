@@ -1,16 +1,104 @@
 from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog, QLineEdit
+from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog, QLineEdit, \
+    QLabel, QWidget, QPushButton, QStackedWidget, QHBoxLayout
 from PyQt5 import QtCore, QtGui
+import sys
+import os
 from PacketDetailsWindow import *
+from DBClient import DBClient
+
 PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp', 'tls', 'http']
+
+
+class LoginWindow(QDialog):
+    def __init__(self):
+        super(LoginWindow, self).__init__()
+        self.setWindowTitle("Login")
+        self.setGeometry(200, 200, 400, 200)
+        self.setMaximumSize(400, 200)
+        self.client = DBClient()
+
+        layout = QVBoxLayout()
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        self.username_label = QLabel("Username:")
+        self.username_input = QLineEdit()
+        layout.addWidget(self.username_label)
+        layout.addWidget(self.username_input)
+
+        self.password_label = QLabel("Password:")
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_label)
+        layout.addWidget(self.password_input)
+
+        self.login_button = QPushButton("Login")
+        self.login_button.clicked.connect(self.login)
+        layout.addWidget(self.login_button)
+
+        self.signup_button = QPushButton("Sign Up")
+        self.signup_button.clicked.connect(self.signup)
+        layout.addWidget(self.signup_button)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.login_button)
+        button_layout.addWidget(self.signup_button)
+        layout.addLayout(button_layout)
+
+        self.setLayout(layout)
+        self.setStyleSheet("""
+            QDialog {
+                background-color: #313242;
+            }
+            QLabel {
+                color: white;
+            }
+            QLineEdit {
+                background-color: #5c5e82;
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton {
+                background-color: #37f05c;
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton:hover {
+                background-color: #45b86c;
+            }
+        """)
+
+    def login(self):
+
+        username = self.username_input.text()
+        password = self.password_input.text()
+        result = self.client.ask_login(username, password)
+        if result is True:
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Login Failed", "Invalid username or password.")
+
+    def signup(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+        result = self.client.ask_signup(username, password)
+        if result is True:
+            self.accept()
+        else:
+            QMessageBox.warning(self, "Signup Failed", "Username already exists")
 
 
 class Gui(QMainWindow):
     def __init__(self):
         super(Gui, self).__init__()
+        self.login_window = LoginWindow()
+        if self.login_window.exec_() == QDialog.Accepted:
+            self.initUI()
         self.setGeometry(100, 100, 1000, 625)
         self.setWindowTitle("CableDolphin")
-        self.initUI()
         self.pdws = []
         self.setMinimumWidth(1000)
         self.setMinimumHeight(625)
@@ -279,3 +367,10 @@ class Gui(QMainWindow):
         else:
             event.accept()
         print(1)
+
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = Gui()
+    window.show()
+    sys.exit(app.exec_())

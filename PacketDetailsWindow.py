@@ -7,7 +7,9 @@ class PacketDetailsWindow(QtWidgets.QWidget):
         super().__init__()
         self.layers_dict = layers_dict
         self.number = number
-        self.initUI()
+    def initUI1(self):
+        self.setGeometry(400, 100, 500, 400)
+        self.login = QtWidgets.QPushButton(self)
 
     def initUI(self):
         self.setWindowTitle(f'Packet {self.number}')

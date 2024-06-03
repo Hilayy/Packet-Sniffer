@@ -5,7 +5,7 @@ from firebase_admin import credentials, firestore
 class DB:
     def __init__(self):
         cred = credentials.Certificate(
-            r'C:\Users\User\Desktop\packet-sniffer-b79f1-firebase-adminsdk-g5i8w-c5bc92d810.json')
+            r'packet-sniffer-b79f1-firebase-adminsdk-g5i8w-c5bc92d810.json')
 
         # Initialize the app with a service account, granting admin privileges
         firebase_admin.initialize_app(cred, {
