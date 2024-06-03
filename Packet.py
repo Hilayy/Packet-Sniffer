@@ -2,6 +2,7 @@ from scapy.all import *
 from scapy.layers.inet import *
 from scapy.layers.tls import *
 from scapy.contrib.igmp import IGMP
+
 TCP_FLAGS = {'S': 'SYN', 'A': 'ACK', 'F': 'FIN', 'P': 'PSH', 'R': 'RST', 'U': 'URG'}
 DHCP_TYPES = {1: 'Discover', 2: 'Offer', 3: 'Request', 4: 'Decline', 5: 'ACK', 6: 'NAK', 7: 'Release', 8: 'Decline'}
 IGMP_TYPES = {
@@ -13,8 +14,9 @@ IGMP_TYPES = {
 TLS_VERSIONS = {b'\x03\x01': '1', b'\x03\x02': '1.1', b'\x03\x03': '1.2', b'\x03\x04': '1.3'}
 TLS_TYPES = {20: 'Change Cipher Spec', 21: 'Alert', 22: 'Handshake', 23: 'Application Data', 24: 'Heartbeat'}
 
+
 class Packet:
-    def __init__(self, count : int, packet_body):
+    def __init__(self, count: int, packet_body):
         self.number = count
         self.info = packet_body
         self.length = self.__get_length()

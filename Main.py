@@ -1,13 +1,3 @@
-import re
-import sys
-from PyQt5 import QtWidgets
-from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog, QLineEdit
-from PyQt5 import QtCore, QtGui
-from threading import Thread, Event, Lock
-from scapy.all import *
-from scapy.layers.inet import *
-from scapy.layers.tls import *
-import time
 from View import *
 from Packet import *
 
@@ -32,14 +22,14 @@ class Sniffer:
         self.save_file_name = ''
 
     def setup_gui(self):
-        self.gui.startRecord.clicked.connect(self.start_sniffing)
-        self.gui.stopRecord.clicked.connect(self.send_stop_packet)
-        self.gui.saveButton.clicked.connect(self.save_recording)
-        self.gui.importButton.clicked.connect(self.import_recording)
-        self.gui.tableWidget.itemDoubleClicked.connect(lambda item: self.gui.open_packet_details(item, self.packets))
+        self.gui.start_record.clicked.connect(self.start_sniffing)
+        self.gui.stop_record.clicked.connect(self.send_stop_packet)
+        self.gui.save_button.clicked.connect(self.save_recording)
+        self.gui.import_button.clicked.connect(self.import_recording)
+        self.gui.table.itemDoubleClicked.connect(lambda item: self.gui.open_packet_details(item, self.packets))
         self.gui.search_bar.textChanged.connect(self.gui.check_valid_search_term)
         self.gui.search_bar.returnPressed.connect(self.handle_filter_search)
-        self.gui.tableWidget.horizontalHeader().sectionClicked.connect(self.header_clicked)
+        self.gui.table.horizontalHeader().sectionClicked.connect(self.header_clicked)
 
     def header_clicked(self, col_num):
         if col_num == 4:  # if parameter is summary, which is not sortable
