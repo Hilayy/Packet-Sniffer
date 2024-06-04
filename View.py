@@ -1,5 +1,6 @@
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSignal
+from PyQt5.QtGui import QPixmap
 from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMessageBox, QFileDialog, QLineEdit, \
     QLabel, QWidget, QPushButton, QStackedWidget, QHBoxLayout
 from PyQt5 import QtCore, QtGui
@@ -15,8 +16,10 @@ class LoginWindow(QDialog):
     def __init__(self):
         super(LoginWindow, self).__init__()
         self.setWindowTitle("Login")
+        self.setWindowIcon(QtGui.QIcon('Images/dolphin.png'))
         self.setGeometry(200, 200, 400, 200)
         self.setMaximumSize(400, 200)
+
         self.client = DBClient()
 
         layout = QVBoxLayout()
@@ -112,6 +115,11 @@ class Gui(QMainWindow):
         self.temp = 1
 
     def initUI(self):
+        self.setWindowIcon(QtGui.QIcon('Images/dolphin.png'))
+        self.image_label = QLabel(self)
+        self.image_label.setGeometry(945, 5, 50, 50)  # Set the position and size of the label
+        pixmap = QPixmap("Images/dolphin2.png")  # Replace 'icon.png' with the path to your image
+        self.image_label.setPixmap(pixmap)
         # Start recording button
         self.start_record = QtWidgets.QPushButton(self)
         self.start_record.setObjectName("StartRecord")
