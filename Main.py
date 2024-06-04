@@ -5,7 +5,7 @@ PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp
 
 
 class Sniffer:
-    def __init__(self, gui: Gui):
+    def __init__(self, gui: MainWindow):
         self.gui = gui
         self.is_start_pressed = False
         self.packets = []
@@ -208,7 +208,7 @@ class Sniffer:
 def window():
     # set window and window properties
     app = QApplication(sys.argv)
-    win = Sniffer(Gui())
+    win = Sniffer(MainWindow())
     win.gui.setStyleSheet("background-color: #1d1e29;")
     win.gui.show()
     sys.exit(app.exec_())

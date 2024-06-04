@@ -94,9 +94,9 @@ class LoginWindow(QDialog):
             QMessageBox.warning(self, "Signup Failed", "Username already exists")
 
 
-class Gui(QMainWindow):
+class MainWindow(QMainWindow):
     def __init__(self):
-        super(Gui, self).__init__()
+        super(MainWindow, self).__init__()
         self.login_window = LoginWindow()
         if self.login_window.exec_() == QDialog.Accepted:
             self.initUI()
@@ -379,6 +379,6 @@ class Gui(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = Gui()
+    window = MainWindow()
     window.show()
     sys.exit(app.exec_())
