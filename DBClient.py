@@ -1,5 +1,6 @@
 import socket
 import json
+import hashlib
 
 HOST = 'localhost'
 PORT = 12345
@@ -11,6 +12,7 @@ class DBClient:
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     def ask_login(self, username, password):
+        password = self.hash_password(password)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)  # Create a new socket instance
         try:
             self.client_socket.connect(ADDR)
@@ -23,6 +25,7 @@ class DBClient:
             self.client_socket.close()
 
     def ask_signup(self, username, password):
+        password = self.hash_password(password)
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
             self.client_socket.connect(ADDR)
@@ -34,3 +37,9 @@ class DBClient:
 
         finally:
             self.client_socket.close()
+
+    def hash_password(self, password):
+        sha256_hash = hashlib.sha256()
+        sha256_hash.update(password.encode('utf-8'))
+        hashed_password = sha256_hash.hexdigest()
+        return hashed_password
