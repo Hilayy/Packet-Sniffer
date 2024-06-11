@@ -300,7 +300,7 @@ class MainWindow(QMainWindow):
         packet_number = int(packet_number.text())
         layers_dict = packets[packet_number - 1].get_layer_info()
         pd = packets[packet_number - 1].info.show(dump=True)
-        pdw = PacketDetailsWindow(layers_dict, packet_number)
+        pdw = PacketDetailsWindow(layers_dict, packet_number, THEMES[self.themes_index])
         self.pdws.append(pdw)
         pdw.setStyleSheet("background-color: #313242;")
         pdw.show()

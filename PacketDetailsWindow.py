@@ -3,15 +3,18 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QDialog, QVBoxLayout, QMe
 from PyQt5 import QtCore, QtGui
 
 class PacketDetailsWindow(QtWidgets.QWidget):
-    def __init__(self, layers_dict, number):
+    def __init__(self, layers_dict, number, theme):
         super().__init__()
         self.layers_dict = layers_dict
         self.number = number
+        self.theme = theme
+        self.initUI()
     def initUI1(self):
         self.setGeometry(400, 100, 500, 400)
         self.login = QtWidgets.QPushButton(self)
 
     def initUI(self):
+        self.setStyleSheet(f"background-color: {self.theme[0]};")
         self.setWindowTitle(f'Packet {self.number}')
         self.setGeometry(400, 100, 500, 400)
         self.buttons = []
@@ -21,7 +24,7 @@ class PacketDetailsWindow(QtWidgets.QWidget):
             button = QtWidgets.QPushButton(self)
             num2 += num1
             button.setGeometry(QtCore.QRect(num2, 5, num1, 30))
-            button.setStyleSheet("background-color: #5c5e82;")
+            button.setStyleSheet(f"background-color: {self.theme[2]};")
             button.setText(key)
             # Use a default argument in lambda to capture the current value of key
             button.clicked.connect(lambda checked, key=key: self.layer_clicked(self.layers_dict[key]))
