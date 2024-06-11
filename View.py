@@ -10,7 +10,7 @@ from PacketDetailsWindow import *
 from DBClient import DBClient
 
 PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp', 'tls', 'http']
-COLORS = [['#1d1e29', '#313242', '#5c5e82'],
+THEMES = [['#1d1e29', '#313242', '#5c5e82'],
           ['#c1e2db', '#9fc7d4', '#78a6b4'],
           ['#ffecd1', '#ffb085', '#e28743'],
           ['#d3e4cd', '#a3cfa7', '#789e80'],
@@ -369,7 +369,7 @@ class MainWindow(QMainWindow):
         self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:#37f05c")
 
     def reset_search_bar(self):
-        colors = COLORS[self.themes_index]
+        colors = THEMES[self.themes_index]
         sb_color = colors[2]
         self.is_search_valid = True
         self.search_bar.setStyleSheet(f"border-radius: 15px; padding: 5px;background-color: {sb_color}")
@@ -393,10 +393,9 @@ class MainWindow(QMainWindow):
 
     def change_theme(self):
         self.themes_index += 1
-        if self.themes_index == 5:
+        if self.themes_index == len(THEMES):
             self.themes_index = 0
-        print(self.themes_index)
-        colors = COLORS[self.themes_index]
+        colors = THEMES[self.themes_index]
         self.setStyleSheet(F"background-color: {colors[0]};")
         self.table.setStyleSheet(
             f"QTableWidget {{ background-color: {colors[1]}; border: 1px solid {colors[1]}; }}"
