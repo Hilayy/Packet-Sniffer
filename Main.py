@@ -209,7 +209,6 @@ def window():
     # set window and window properties
     app = QApplication(sys.argv)
     win = Sniffer(MainWindow())
-    win.gui.setStyleSheet("background-color: #1d1e29;")
     win.gui.show()
     sys.exit(app.exec_())
 

@@ -10,6 +10,13 @@ from PacketDetailsWindow import *
 from DBClient import DBClient
 
 PROTOCOLS = ['arp', 'udp', 'tcp', 'dns', 'icmp', 'icmpv6', 'mdns', 'ssdp', 'igmp', 'tls', 'http']
+COLORS = [['#1d1e29', '#313242', '#5c5e82'],
+          ['#c1e2db', '#9fc7d4', '#78a6b4'],
+          ['#ffecd1', '#ffb085', '#e28743'],
+          ['#d3e4cd', '#a3cfa7', '#789e80'],
+          ['#e9e7fd', '#c4b8ea', '#8b82d1']
+
+          ]
 
 
 class LoginWindow(QDialog):
@@ -113,13 +120,10 @@ class MainWindow(QMainWindow):
         self.is_start_pressed = False
         self.is_closed = False
         self.temp = 1
+        self.themes_index = 0
 
     def initUI(self):
-        self.setWindowIcon(QtGui.QIcon('Images/dolphin.png'))
-        self.image_label = QLabel(self)
-        self.image_label.setGeometry(945, 5, 50, 50)  # Set the position and size of the label
-        pixmap = QPixmap("Images/dolphin2.png")  # Replace 'icon.png' with the path to your image
-        self.image_label.setPixmap(pixmap)
+        self.setStyleSheet("background-color: #1d1e29;")
         # Start recording button
         self.start_record = QtWidgets.QPushButton(self)
         self.start_record.setObjectName("StartRecord")
@@ -146,13 +150,22 @@ class MainWindow(QMainWindow):
         # Import Button
         self.import_button = QtWidgets.QPushButton(self)
         self.import_button.setObjectName("ImportButton")
-        self.import_button.setGeometry(QtCore.QRect(10, 12, 70, 40))
+        self.import_button.setGeometry(QtCore.QRect(10, 10, 70, 40))
         self.import_button.setStyleSheet(u"background-color:transparent")
         font = QtGui.QFont("Circular", 10)
         self.import_button.setFont(font)
         import_icon = QtGui.QIcon('Images/import_icon.png')
         self.import_button.setIcon(import_icon)
-        self.import_button.setIconSize(import_icon.actualSize(QtCore.QSize(35, 35)))
+        self.import_button.setIconSize(import_icon.actualSize(QtCore.QSize(37, 37)))
+
+        self.theme_button = QtWidgets.QPushButton(self)
+        self.theme_button.setObjectName("ThemeButton")
+        self.theme_button.setGeometry(QtCore.QRect(935, 10, 70, 40))
+        self.theme_button.setStyleSheet(u"background-color:transparent")
+        theme_icon = QtGui.QIcon('Images/theme_icon.png')
+        self.theme_button.setIcon(theme_icon)
+        self.theme_button.setIconSize(import_icon.actualSize(QtCore.QSize(40, 40)))
+        self.theme_button.clicked.connect(self.change_theme)
 
         # View filter search bar
         self.search_bar = QLineEdit(self)
@@ -266,6 +279,7 @@ class MainWindow(QMainWindow):
         height = event.size().height()
         self.adjust_table_size(width, height)
         self.search_bar.setFixedWidth(width - 20)
+        self.theme_button.setGeometry(QtCore.QRect(width - 65, 10, 70, 40))
 
     def adjust_table_size(self, width, height):
         self.table.setColumnWidth(0, 100)
@@ -355,8 +369,10 @@ class MainWindow(QMainWindow):
         self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:#37f05c")
 
     def reset_search_bar(self):
+        colors = COLORS[self.themes_index]
+        sb_color = colors[2]
         self.is_search_valid = True
-        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
+        self.search_bar.setStyleSheet(f"border-radius: 15px; padding: 5px;background-color: {sb_color}")
 
     def closeEvent(self, event):
         if self.is_start_pressed:
@@ -374,7 +390,25 @@ class MainWindow(QMainWindow):
                 event.ignore()
         else:
             event.accept()
-        print(1)
+
+    def change_theme(self):
+        self.themes_index += 1
+        if self.themes_index == 5:
+            self.themes_index = 0
+        print(self.themes_index)
+        colors = COLORS[self.themes_index]
+        self.setStyleSheet(F"background-color: {colors[0]};")
+        self.table.setStyleSheet(
+            f"QTableWidget {{ background-color: {colors[1]}; border: 1px solid {colors[1]}; }}"
+            f"QTableCornerButton::section {{ background-color: {colors[2]}; }}"
+        )
+
+        header_stylesheet = f"QHeaderView::section {{ background-color: {colors[2]}; }}"
+        self.table.horizontalHeader().setStyleSheet(header_stylesheet)
+        self.table.verticalHeader().setStyleSheet(header_stylesheet)
+
+        self.search_bar.setStyleSheet(f"border-radius: 15px; padding: 5px;background-color: {colors[2]}")
+        self.check_valid_search_term()
 
 
 if __name__ == "__main__":
