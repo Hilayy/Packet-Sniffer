@@ -15,8 +15,14 @@ THEMES = [['#1d1e29', '#313242', '#5c5e82'],
           ['#ffecd1', '#ffb085', '#e28743'],
           ['#d3e4cd', '#a3cfa7', '#789e80'],
           ['#e9e7fd', '#c4b8ea', '#8b82d1']
-
           ]
+
+
+def get_themes_index():
+    with open('Users Theme.txt', 'r') as file:
+        line = file.readline()
+        ti = int(line[3:])
+        return ti
 
 
 class LoginWindow(QDialog):
@@ -26,7 +32,7 @@ class LoginWindow(QDialog):
         self.setWindowIcon(QtGui.QIcon('Images/dolphin.png'))
         self.setGeometry(200, 200, 400, 200)
         self.setMaximumSize(400, 200)
-
+        self.themes_index = get_themes_index()
         self.client = DBClient()
 
         layout = QVBoxLayout()
@@ -57,28 +63,28 @@ class LoginWindow(QDialog):
         layout.addLayout(button_layout)
 
         self.setLayout(layout)
-        self.setStyleSheet("""
-            QDialog {
-                background-color: #313242;
-            }
-            QLabel {
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {THEMES[self.themes_index][1]};
+            }}
+            QLabel {{
                 color: white;
-            }
-            QLineEdit {
-                background-color: #5c5e82;
+            }}
+            QLineEdit {{
+                background-color: {THEMES[self.themes_index][2]};
                 color: white;
                 border-radius: 5px;
                 padding: 5px;
-            }
-            QPushButton {
+            }}
+            QPushButton {{
                 background-color: #37f05c;
                 color: white;
                 border-radius: 5px;
                 padding: 5px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: #45b86c;
-            }
+            }}
         """)
 
     def login(self):
@@ -100,12 +106,22 @@ class LoginWindow(QDialog):
         else:
             QMessageBox.warning(self, "Signup Failed", "Username already exists")
 
+    def check_password_strength(self, password):
+        if len(password) < 8:
+            return False
+        if not any(c.isupper() for c in password):
+            return False
+        if not any(c.isnumeric() for c in password):
+            return False
+        return True
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super(MainWindow, self).__init__()
         self.login_window = LoginWindow()
         if self.login_window.exec_() == QDialog.Accepted:
+            self.themes_index = get_themes_index()
             self.initUI()
         self.setGeometry(100, 100, 1000, 625)
         self.setWindowTitle("CableDolphin")
@@ -120,10 +136,16 @@ class MainWindow(QMainWindow):
         self.is_start_pressed = False
         self.is_closed = False
         self.temp = 1
-        self.themes_index = 0
+
+
+    def set_themes_index(self, ti):
+        with open('Users Theme.txt', 'w') as file:
+            new_line = f'ti={ti}'
+            file.write(new_line + '\n')
+
 
     def initUI(self):
-        self.setStyleSheet("background-color: #1d1e29;")
+        self.setStyleSheet(f"background-color: {THEMES[self.themes_index][0]};")
         # Start recording button
         self.start_record = QtWidgets.QPushButton(self)
         self.start_record.setObjectName("StartRecord")
@@ -170,15 +192,15 @@ class MainWindow(QMainWindow):
         # View filter search bar
         self.search_bar = QLineEdit(self)
         self.search_bar.setGeometry(QtCore.QRect(10, 140, 230, 30))
-        self.search_bar.setStyleSheet("border-radius: 15px; padding: 5px;background-color:rgb(92, 94, 130)")
+        self.search_bar.setStyleSheet(f"border-radius: 15px; padding: 5px;background-color:{THEMES[self.themes_index][2]}")
         self.search_bar.setPlaceholderText("Filter by protocol...")
         self.search_bar.setVisible(True)
 
         # table
         self.table = QtWidgets.QTableWidget(self)
         self.table.setStyleSheet(
-            "QTableWidget { background-color: #313242; border: 1px solid #313242; }"
-            "QTableCornerButton::section { background-color: #5c5e82; }"
+            f"QTableWidget {{ background-color: {THEMES[self.themes_index][1]}; border: 1px solid #313242; }}"
+
         )
         self.table.setColumnCount(5)
         self.table.setRowCount(0)
@@ -194,7 +216,7 @@ class MainWindow(QMainWindow):
         self.font.setPointSize(13)
         self.table.horizontalHeader().setFont(self.font)
 
-        header_stylesheet = "QHeaderView::section { background-color: #5c5e82; }"
+        header_stylesheet = f"QHeaderView::section {{ background-color: {THEMES[self.themes_index][2]}; }}"
         self.table.horizontalHeader().setStyleSheet(header_stylesheet)
         self.table.verticalHeader().setStyleSheet(header_stylesheet)
 
@@ -393,6 +415,7 @@ class MainWindow(QMainWindow):
 
     def change_theme(self):
         self.themes_index += 1
+        self.set_themes_index(self.themes_index)
         if self.themes_index == len(THEMES):
             self.themes_index = 0
         colors = THEMES[self.themes_index]
