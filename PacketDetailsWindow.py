@@ -32,6 +32,16 @@ class PacketDetailsWindow(QtWidgets.QWidget):
 
     def layer_clicked(self, info):
         label = QtWidgets.QLabel(info, self)
+        label.setStyleSheet("""
+                    QLabel {
+                        font-family: 'Arial';
+                        font-size: 16px;
+                        color: #2E2E2E;  # Dark Gray color
+                        background-color: #F5F5F5;  # Light Gray background
+                        padding: 10px;
+                        border-radius: 5px;
+                    }
+                """)
         font = font = QtGui.QFont("Circular")
         font.setPointSize(11)
         label.setFont(font)

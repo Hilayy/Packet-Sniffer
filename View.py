@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         if self.login_window.exec_() == QDialog.Accepted:
             self.themes_index = get_themes_index()
             self.initUI()
+        self.setWindowIcon(QtGui.QIcon('Images/dolphin.png'))
         self.setGeometry(100, 100, 1000, 625)
         self.setWindowTitle("CableDolphin")
         self.pdws = []
