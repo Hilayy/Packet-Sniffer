@@ -1,6 +1,7 @@
 import socket
 import json
 from DB import DB
+
 # Create a socket object
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
@@ -39,7 +40,6 @@ class DBServer:
             return 'X'
         else:
             if self.db.password_matches(result, dict['password']):
-
                 return 'V'
         return 'X'
 
@@ -47,11 +47,11 @@ class DBServer:
         result = self.db.username_exists(username=dict['username'])
         if result is not None:
             return 'X'
+        password = dict['password']
+
         user_dict = {'username': dict['username'], 'password': dict['password']}
         self.db.add_user(user_dict)
         return 'V'
-
-
 
 
 server = DBServer()

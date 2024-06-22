@@ -43,7 +43,7 @@ class PacketDetailsWindow(QtWidgets.QWidget):
                     }
                 """)
         font = font = QtGui.QFont("Circular")
-        font.setPointSize(11)
+        font.setPointSize(12)
         label.setFont(font)
         label.setGeometry(QtCore.QRect(0, 50, 400, 300))
 

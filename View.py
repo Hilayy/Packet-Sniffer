@@ -22,6 +22,8 @@ def get_themes_index():
     with open('Users Theme.txt', 'r') as file:
         line = file.readline()
         ti = int(line[3:])
+        if ti == 5:
+            ti = 0
         return ti
 
 
@@ -103,17 +105,15 @@ class LoginWindow(QDialog):
         result = self.client.ask_signup(username, password)
         if result is True:
             self.accept()
-        else:
+        if result is False:
             QMessageBox.warning(self, "Signup Failed", "Username already exists")
+        if result is None:
+            QMessageBox.warning(self, "Signup Failed", "Password must contain the following:\n-At least 8 characters"
+                                                       "\n-At least 1 Uppercase letter\n-At least 1 digit")
 
-    def check_password_strength(self, password):
-        if len(password) < 8:
-            return False
-        if not any(c.isupper() for c in password):
-            return False
-        if not any(c.isnumeric() for c in password):
-            return False
-        return True
+
+
+
 
 
 class MainWindow(QMainWindow):
